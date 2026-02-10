@@ -38,7 +38,7 @@ func runScan(args []string) {
 	fs := flag.NewFlagSet("scan", flag.ExitOnError)
 	configPath := fs.String("config", "/etc/auditarr/config.toml", "Path to configuration file")
 	verbose := fs.Bool("verbose", false, "Enable verbose output")
-	fs.Parse(args)
+	_ = fs.Parse(args)
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {

@@ -110,7 +110,7 @@ func (qbc *QBCollector) authenticate(ctx context.Context) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		io.Copy(io.Discard, resp.Body)
+		_, _ = io.Copy(io.Discard, resp.Body)
 		return fmt.Errorf("authentication failed with status %d", resp.StatusCode)
 	}
 
@@ -121,7 +121,7 @@ func (qbc *QBCollector) authenticate(ctx context.Context) error {
 		}
 	}
 
-	io.Copy(io.Discard, resp.Body)
+	_, _ = io.Copy(io.Discard, resp.Body)
 
 	if qbc.cookie == "" {
 		return fmt.Errorf("no session cookie received")
@@ -154,12 +154,12 @@ func (qbc *QBCollector) fetchTorrents(ctx context.Context) ([]qbTorrent, error) 
 		qbc.mu.Lock()
 		qbc.cookie = ""
 		qbc.mu.Unlock()
-		io.Copy(io.Discard, resp.Body)
+		_, _ = io.Copy(io.Discard, resp.Body)
 		return nil, fmt.Errorf("session expired")
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		io.Copy(io.Discard, resp.Body)
+		_, _ = io.Copy(io.Discard, resp.Body)
 		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
 	}
 
@@ -192,7 +192,7 @@ func (qbc *QBCollector) fetchTorrentFiles(ctx context.Context, hash string) ([]s
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		io.Copy(io.Discard, resp.Body)
+		_, _ = io.Copy(io.Discard, resp.Body)
 		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
 	}
 
