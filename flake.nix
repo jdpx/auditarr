@@ -19,8 +19,8 @@
             
             src = ./.;
             
-            # Set to empty string to use go modules directly (no vendor directory)
-            vendorHash = "";
+            # Hash of go modules (computed by nix)
+            vendorHash = "sha256-pbA/AlBz3cQYRTMnQ/qBPcinYOKokrBLNhkbRTq54gE=";
             
             meta = with pkgs.lib; {
               description = "Non-destructive audit tool for Arr media libraries";
