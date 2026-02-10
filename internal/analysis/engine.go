@@ -78,7 +78,6 @@ func (e *Engine) Analyze(
 	result := &AnalysisResult{}
 
 	arrLookup := buildArrLookup(sonarrFiles, radarrFiles)
-	torrentLookup := buildTorrentLookup(torrents)
 
 	for _, media := range mediaFiles {
 		if shouldSkip(media.Path, e.skipPaths) {
@@ -128,7 +127,7 @@ func (e *Engine) Analyze(
 
 	for _, t := range torrents {
 		if t.State == models.StateCompleted && !t.WithinGraceWindow(e.qbittorrentGraceHours) {
-			if !hasHardlinkedFile(t, torrentLookup) {
+			if !hasMatchingMediaFile(t, arrLookup) {
 				result.UnlinkedTorrents = append(result.UnlinkedTorrents, t)
 			}
 		}
@@ -178,21 +177,10 @@ func buildArrLookup(sonarrFiles, radarrFiles []models.ArrFile) map[string]*model
 	return lookup
 }
 
-func buildTorrentLookup(torrents []models.Torrent) map[string]*models.Torrent {
-	lookup := make(map[string]*models.Torrent)
-	for i := range torrents {
-		for _, f := range torrents[i].Files {
-			fullPath := filepath.Join(torrents[i].SavePath, f)
-			lookup[normalizePath(fullPath)] = &torrents[i]
-		}
-	}
-	return lookup
-}
-
-func hasHardlinkedFile(t models.Torrent, lookup map[string]*models.Torrent) bool {
+func hasMatchingMediaFile(t models.Torrent, mediaLookup map[string]*models.ArrFile) bool {
 	for _, f := range t.Files {
 		fullPath := filepath.Join(t.SavePath, f)
-		if _, exists := lookup[normalizePath(fullPath)]; exists {
+		if _, exists := mediaLookup[normalizePath(fullPath)]; exists {
 			return true
 		}
 	}

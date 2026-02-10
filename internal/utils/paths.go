@@ -62,10 +62,6 @@ func shouldSkipPath(path string, skipPaths []string) bool {
 	return false
 }
 
-func NormalizePath(p string) string {
-	return strings.ToLower(filepath.Clean(p))
-}
-
 func IsMediaFile(path string) bool {
 	ext := strings.ToLower(filepath.Ext(path))
 	mediaExts := []string{".mkv", ".mp4", ".avi", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".mpg", ".mpeg", ".ts"}

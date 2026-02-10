@@ -60,7 +60,7 @@ func (c *Config) GetReportPath() string {
 		reportDir = DefaultReportDir()
 	}
 
-	if reportDir[:1] == "~" || reportDir[:5] == "$HOME" {
+	if (len(reportDir) >= 1 && reportDir[:1] == "~") || (len(reportDir) >= 5 && reportDir[:5] == "$HOME") {
 		home, _ := os.UserHomeDir()
 		if home != "" {
 			if reportDir[:1] == "~" {

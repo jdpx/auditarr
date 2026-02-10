@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jdpx/auditarr/internal/models"
@@ -18,6 +20,7 @@ type QBCollector struct {
 	username string
 	password string
 	cookie   string
+	mu       sync.Mutex
 }
 
 func NewQBCollector(baseURL, username, password string) *QBCollector {
@@ -81,6 +84,9 @@ func (qbc *QBCollector) Collect(ctx context.Context) ([]models.Torrent, error) {
 }
 
 func (qbc *QBCollector) authenticate(ctx context.Context) error {
+	qbc.mu.Lock()
+	defer qbc.mu.Unlock()
+
 	if qbc.cookie != "" {
 		return nil
 	}
@@ -104,6 +110,7 @@ func (qbc *QBCollector) authenticate(ctx context.Context) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		io.Copy(io.Discard, resp.Body)
 		return fmt.Errorf("authentication failed with status %d", resp.StatusCode)
 	}
 
@@ -114,6 +121,8 @@ func (qbc *QBCollector) authenticate(ctx context.Context) error {
 		}
 	}
 
+	io.Copy(io.Discard, resp.Body)
+
 	if qbc.cookie == "" {
 		return fmt.Errorf("no session cookie received")
 	}
@@ -122,13 +131,17 @@ func (qbc *QBCollector) authenticate(ctx context.Context) error {
 }
 
 func (qbc *QBCollector) fetchTorrents(ctx context.Context) ([]qbTorrent, error) {
+	qbc.mu.Lock()
+	cookie := qbc.cookie
+	qbc.mu.Unlock()
+
 	url := fmt.Sprintf("%s/api/v2/torrents/info", qbc.baseURL)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Cookie", fmt.Sprintf("SID=%s", qbc.cookie))
+	req.Header.Set("Cookie", fmt.Sprintf("SID=%s", cookie))
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := qbc.client.Do(req)
@@ -138,11 +151,15 @@ func (qbc *QBCollector) fetchTorrents(ctx context.Context) ([]qbTorrent, error) 
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusForbidden {
+		qbc.mu.Lock()
 		qbc.cookie = ""
+		qbc.mu.Unlock()
+		io.Copy(io.Discard, resp.Body)
 		return nil, fmt.Errorf("session expired")
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		io.Copy(io.Discard, resp.Body)
 		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
 	}
 
@@ -155,13 +172,17 @@ func (qbc *QBCollector) fetchTorrents(ctx context.Context) ([]qbTorrent, error) 
 }
 
 func (qbc *QBCollector) fetchTorrentFiles(ctx context.Context, hash string) ([]string, error) {
+	qbc.mu.Lock()
+	cookie := qbc.cookie
+	qbc.mu.Unlock()
+
 	url := fmt.Sprintf("%s/api/v2/torrents/files?hash=%s", qbc.baseURL, hash)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Cookie", fmt.Sprintf("SID=%s", qbc.cookie))
+	req.Header.Set("Cookie", fmt.Sprintf("SID=%s", cookie))
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := qbc.client.Do(req)
@@ -171,6 +192,7 @@ func (qbc *QBCollector) fetchTorrentFiles(ctx context.Context, hash string) ([]s
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		io.Copy(io.Discard, resp.Body)
 		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
 	}
 
