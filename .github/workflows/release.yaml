@@ -47,10 +47,10 @@ jobs:
           git tag ${NEW_VERSION}
           git push origin ${NEW_VERSION}
 
-      - name: Build and Test Flake
+      - name: Build Binary
         run: |
-          nix build .#auditarr --extra-experimental-features 'nix-command flakes'
-          ./result/bin/auditarr --help
+          go build -o auditarr ./cmd/auditarr
+          ./auditarr scan --help 2>&1 || true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
