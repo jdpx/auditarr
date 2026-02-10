@@ -1,0 +1,62 @@
+# Media Audit Configuration
+# Note: Secrets (API keys, passwords, webhooks) stored in plaintext per operational decision
+
+[paths]
+media_root = "/mnt/media-arr/media"
+torrent_root = "/mnt/media-arr/torrents"
+
+[sonarr]
+url = "http://localhost:8989"
+api_key = "your-api-key-here"
+grace_hours = 48
+
+[radarr]
+url = "http://localhost:7878"
+api_key = "your-api-key-here"
+grace_hours = 48
+
+[qbittorrent]
+url = "http://localhost:8080"
+username = "admin"
+password = "your-password-here"
+grace_hours = 24
+
+[notifications]
+discord_webhook = "https://discord.com/api/webhooks/..."
+
+[outputs]
+# Platform-specific defaults applied if not specified:
+# - Linux/NixOS: /var/lib/auditarr/reports
+# - macOS: ~/Library/Application Support/auditarr/reports
+# - Other: ./reports
+report_dir = "/var/lib/auditarr/reports"
+
+[suspicious]
+# Optional: Override default suspicious extensions
+# extensions = ["exe", "msi", "bat", "zip", "rar"]
+# flag_archives = true  # Flag zip/rar/7z in media paths
+
+[permissions]
+# Permission auditing for arr_stack setup (matches NixOS configuration)
+enabled = true
+
+# Expected group GID (arr_stack = 1000 in your NixOS setup)
+group_gid = 1000
+
+# Allowed UIDs that can own files (from users.nix)
+# sonarr=1001, radarr=1002, prowlarr=1003, qbittorrent=1004, bazarr=1005, etc.
+allowed_uids = [1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008]
+
+# Paths that should have SGID bit set (from storage.nix tmpfiles rules)
+sgid_paths = [
+    "/mnt/media-arr/media",
+    "/mnt/media-arr/media/tv",
+    "/mnt/media-arr/media/movies",
+    "/mnt/media-arr/media/music",
+]
+
+# Paths to skip permission checks (optional)
+# skip_paths = ["/mnt/media-arr/torrents"]
+
+# Severity for nonstandard permissions (info, warning, error)
+nonstandard_severity = "warning"
