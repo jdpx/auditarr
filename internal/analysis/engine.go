@@ -227,10 +227,12 @@ func isHardlinked(path string) bool {
 	var stat syscall.Stat_t
 	err := syscall.Stat(path, &stat)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "HARDLINK_DEBUG: stat failed for %s: %v\n", path, err)
 		return false
 	}
-	// v2: Check hardlink count to detect properly linked files regardless of filename
-	return stat.Nlink > 1
+	result := stat.Nlink > 1
+	fmt.Fprintf(os.Stderr, "HARDLINK_DEBUG: %s nlink=%d hardlinked=%v\n", path, stat.Nlink, result)
+	return result
 }
 
 func (e *Engine) normalizePath(p string) string {
