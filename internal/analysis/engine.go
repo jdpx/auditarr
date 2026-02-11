@@ -150,8 +150,12 @@ func (e *Engine) Analyze(
 
 	for _, t := range torrents {
 		if t.State == models.StateCompleted && !t.WithinGraceWindow(e.qbittorrentGraceHours) {
-			if !e.hasMatchingMediaFile(t, arrLookup) {
+			matched := e.hasMatchingMediaFile(t, arrLookup)
+			if !matched {
+				fmt.Fprintf(os.Stderr, "UNLINKED: %s (hash=%s)\n", t.Name, t.Hash)
 				result.UnlinkedTorrents = append(result.UnlinkedTorrents, t)
+			} else {
+				fmt.Fprintf(os.Stderr, "LINKED: %s (hash=%s)\n", t.Name, t.Hash)
 			}
 		}
 	}
