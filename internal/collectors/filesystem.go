@@ -8,6 +8,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/jdpx/auditarr/internal/analysis"
 	"github.com/jdpx/auditarr/internal/models"
 )
 
@@ -64,6 +65,10 @@ func (fc *FilesystemCollector) Collect(ctx context.Context) ([]models.MediaFile,
 		}
 
 		if strings.HasPrefix(filepath.Base(path), ".") {
+			return nil
+		}
+
+		if analysis.IsMetadataFile(path) {
 			return nil
 		}
 

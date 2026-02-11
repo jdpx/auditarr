@@ -214,6 +214,10 @@ func getReason(class models.MediaClassification, media models.MediaFile, arrFile
 }
 
 func (e *Engine) auditPermissions(file models.FilePermissions) []models.PermissionIssue {
+	if IsMetadataFile(file.Path) {
+		return nil
+	}
+
 	var issues []models.PermissionIssue
 
 	if !e.isValidOwner(file.OwnerUID) {
