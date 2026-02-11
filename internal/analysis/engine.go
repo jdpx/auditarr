@@ -221,12 +221,21 @@ func (e *Engine) auditPermissions(file models.FilePermissions) []models.Permissi
 	var issues []models.PermissionIssue
 
 	if !e.isValidOwner(file.OwnerUID) {
-		issues = append(issues, models.PermissionIssue{
-			Path:     file.Path,
-			Issue:    "wrong_owner",
-			Severity: "error",
-			FixHint:  fmt.Sprintf("File owned by UID %d, expected one of: %v", file.OwnerUID, e.allowedUIDs),
-		})
+		if file.IsDirectory && file.OwnerUID == 0 {
+			issues = append(issues, models.PermissionIssue{
+				Path:     file.Path,
+				Issue:    "wrong_owner",
+				Severity: "warning",
+				FixHint:  fmt.Sprintf("Directory owned by root (UID 0), expected one of: %v", e.allowedUIDs),
+			})
+		} else {
+			issues = append(issues, models.PermissionIssue{
+				Path:     file.Path,
+				Issue:    "wrong_owner",
+				Severity: "error",
+				FixHint:  fmt.Sprintf("File owned by UID %d, expected one of: %v", file.OwnerUID, e.allowedUIDs),
+			})
+		}
 	}
 
 	if file.GroupGID != e.expectedGroupGID {
