@@ -93,16 +93,23 @@ func (e *Engine) Analyze(
 
 	arrLookup := e.buildArrLookup(sonarrFiles, radarrFiles)
 
-	for i, media := range mediaFiles {
+	lookupCount := 0
+	foundCount := 0
+	for _, media := range mediaFiles {
 		if shouldSkip(media.Path, e.skipPaths) {
 			continue
 		}
 
 		lookupKey := e.normalizePath(media.Path)
 		arrFile := arrLookup[lookupKey]
-		if i == 0 {
-			fmt.Fprintf(os.Stderr, "DEBUG: First media path: %s lookup=%s found=%v\n",
+
+		if lookupCount < 10 {
+			fmt.Fprintf(os.Stderr, "MEDIA_LOOKUP: path=%s lookup=%s found=%v\n",
 				media.Path, lookupKey, arrFile != nil)
+			lookupCount++
+		}
+		if arrFile != nil {
+			foundCount++
 		}
 		graceHours := e.getGraceHours(arrFile)
 
@@ -138,13 +145,17 @@ func (e *Engine) Analyze(
 			result.Summary.OrphanCount++
 		}
 		result.Summary.TotalFiles++
+	}
+	fmt.Fprintf(os.Stderr, "MEDIA_LOOKUP: Sampled %d files, found %d in Arr lookup\n", lookupCount, foundCount)
 
-		if isSuspicious, reason := models.IsSuspicious(media.Path, e.suspiciousExtensions, e.flagArchives); isSuspicious {
-			result.SuspiciousFiles = append(result.SuspiciousFiles, models.SuspiciousFile{
-				Path:   media.Path,
-				Reason: reason,
-			})
-			result.Summary.SuspiciousCount++
+	// Debug: Show first 5 lookup keys
+	count := 0
+	for k := range arrLookup {
+		if count < 5 {
+			fmt.Fprintf(os.Stderr, "ARR_LOOKUP_KEY: %s\n", k)
+			count++
+		} else {
+			break
 		}
 	}
 
