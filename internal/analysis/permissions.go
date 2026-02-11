@@ -14,6 +14,7 @@ var metadataPatterns = []string{
 	"season*-poster.jpg", "season*-poster.png",
 	"banner.jpg", "landscape.jpg", "clearlogo.png",
 	"*.nfo",
+	"*.torrent",
 }
 
 func IsMetadataFile(path string) bool {

@@ -101,7 +101,7 @@ func (e *Engine) Analyze(
 
 		lookupKey := e.normalizePath(media.Path)
 		arrFile := arrLookup[lookupKey]
-		graceHours := e.getGraceHours(arrFile)
+		graceHours := e.getGraceHours(arrFile, media.Source)
 
 		var classification models.MediaClassification
 		var shouldInclude bool
@@ -175,8 +175,11 @@ func (e *Engine) Analyze(
 	return result
 }
 
-func (e *Engine) getGraceHours(arrFile *models.ArrFile) int {
+func (e *Engine) getGraceHours(arrFile *models.ArrFile, source models.MediaFileSource) int {
 	if arrFile == nil {
+		if source == models.MediaSourceTorrent {
+			return e.qbittorrentGraceHours
+		}
 		return 0
 	}
 	if arrFile.SeriesID > 0 {
