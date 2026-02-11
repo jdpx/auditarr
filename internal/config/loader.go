@@ -52,6 +52,24 @@ func (c *Config) applyDefaults() {
 	if len(c.Suspicious.Extensions) == 0 {
 		c.Suspicious.Extensions = DefaultSuspiciousExtensions()
 	}
+
+	c.applyDefaultPathMappings()
+}
+
+func (c *Config) applyDefaultPathMappings() {
+	if len(c.PathMappings) > 0 {
+		return
+	}
+
+	c.PathMappings = make(map[string]string)
+
+	if c.Paths.MediaRoot != "" {
+		c.PathMappings["/data/media"] = c.Paths.MediaRoot
+	}
+
+	if c.Paths.TorrentRoot != "" {
+		c.PathMappings["/data/torrents"] = c.Paths.TorrentRoot
+	}
 }
 
 func (c *Config) GetReportPath() string {
