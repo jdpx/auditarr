@@ -38,15 +38,15 @@ func (c *Config) applyDefaults() {
 	}
 
 	if c.Sonarr.GraceHours == 0 {
-		c.Sonarr.GraceHours = 48
+		c.Sonarr.GraceHours = 24
 	}
 
 	if c.Radarr.GraceHours == 0 {
-		c.Radarr.GraceHours = 48
+		c.Radarr.GraceHours = 24
 	}
 
 	if c.Qbittorrent.GraceHours == 0 {
-		c.Qbittorrent.GraceHours = 24
+		c.Qbittorrent.GraceHours = 12
 	}
 
 	if len(c.Suspicious.Extensions) == 0 {
