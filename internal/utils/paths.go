@@ -11,7 +11,29 @@ import (
 	"github.com/jdpx/auditarr/internal/models"
 )
 
-func CollectPermissions(root string, skipPaths []string) ([]models.FilePermissions, error) {
+func CollectPermissions(mediaRoot, torrentRoot string, skipPaths []string) ([]models.FilePermissions, error) {
+	var allPermissions []models.FilePermissions
+
+	if mediaRoot != "" {
+		perms, err := collectFromRoot(mediaRoot, skipPaths)
+		if err != nil {
+			return nil, fmt.Errorf("failed to collect permissions from media root: %w", err)
+		}
+		allPermissions = append(allPermissions, perms...)
+	}
+
+	if torrentRoot != "" {
+		perms, err := collectFromRoot(torrentRoot, skipPaths)
+		if err != nil {
+			return nil, fmt.Errorf("failed to collect permissions from torrent root: %w", err)
+		}
+		allPermissions = append(allPermissions, perms...)
+	}
+
+	return allPermissions, nil
+}
+
+func collectFromRoot(root string, skipPaths []string) ([]models.FilePermissions, error) {
 	var permissions []models.FilePermissions
 
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {

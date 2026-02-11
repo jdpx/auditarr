@@ -33,7 +33,8 @@ func (mf *MarkdownFormatter) Format(result *analysis.AnalysisResult, cfg *config
 	buf.WriteString("|----------|-------|--------|-------------|\n")
 	buf.WriteString(fmt.Sprintf("| Healthy Media | %d | ✅ | Tracked by Arr and hardlinked to torrent |\n", result.Summary.HealthyCount))
 	buf.WriteString(fmt.Sprintf("| At Risk | %d | ⚠️ | Tracked by Arr but NOT hardlinked (no torrent protection) |\n", result.Summary.AtRiskCount))
-	buf.WriteString(fmt.Sprintf("| Orphaned | %d | ❌ | Not tracked by Arr (outside grace window) |\n", result.Summary.OrphanCount))
+	buf.WriteString(fmt.Sprintf("| Orphaned Media | %d | ❌ | Not tracked by Arr (outside grace window) |\n", result.Summary.OrphanCount))
+	buf.WriteString(fmt.Sprintf("| Orphaned Downloads | %d | 💾 | Files in torrent dir not hardlinked or tracked |\n", result.Summary.OrphanedDownloadCount))
 	buf.WriteString(fmt.Sprintf("| Suspicious Files | %d | 🚨 | Suspicious extensions detected |\n", result.Summary.SuspiciousCount))
 	buf.WriteString("\n")
 
@@ -109,6 +110,39 @@ func (mf *MarkdownFormatter) Format(result *analysis.AnalysisResult, cfg *config
 		buf.WriteString("\n")
 	}
 
+	orphanedDownloads := filterByClassification(result.ClassifiedMedia, models.MediaOrphanedDownload)
+	if len(orphanedDownloads) > 0 {
+		var totalSize int64
+		for _, cm := range orphanedDownloads {
+			totalSize += cm.File.Size
+		}
+		buf.WriteString("## Orphaned Downloads\n\n")
+		buf.WriteString("Files in torrent directories that are NOT hardlinked to the media library and NOT tracked by Sonarr/Radarr:\n\n")
+		buf.WriteString("**What this checks**: Scans torrent download directories for video files with hardlink count = 1 that aren't tracked by Arr services.\n\n")
+		buf.WriteString("**Why this matters**: These are orphaned downloads consuming disk space unnecessarily. They represent:\n\n")
+		buf.WriteString("- Duplicate downloads where only one version was imported (e.g., multiple quality releases)\n")
+		buf.WriteString("- Failed or abandoned imports that never completed\n")
+		buf.WriteString("- Files that became orphaned after Arr database changes\n")
+		buf.WriteString("- Downloads that exceeded the quality profile threshold\n\n")
+		buf.WriteString("**Key indicators**:\n")
+		buf.WriteString("- File exists in torrent directory but not in media library\n")
+		buf.WriteString("- Hardlink count = 1 (not linked to media)\n")
+		buf.WriteString("- Not found in Sonarr/Radarr episode/movie lists\n")
+		buf.WriteString("- Age exceeds grace window\n\n")
+		buf.WriteString(fmt.Sprintf("**Total Size**: %s\n\n", formatBytes(totalSize)))
+		buf.WriteString(fmt.Sprintf("**File Count**: %d\n\n", len(orphanedDownloads)))
+		buf.WriteString("| Path | Age | Size | Hardlinks |\n")
+		buf.WriteString("|------|-----|------|-----------|\n")
+		sort.Slice(orphanedDownloads, func(i, j int) bool {
+			return orphanedDownloads[i].File.Path < orphanedDownloads[j].File.Path
+		})
+		for _, cm := range orphanedDownloads {
+			age := time.Since(cm.File.ModTime)
+			buf.WriteString(fmt.Sprintf("| `%s` | %s | %s | %d |\n", escapeMarkdown(cm.File.Path), formatDuration(age), formatBytes(cm.File.Size), cm.File.HardlinkCount))
+		}
+		buf.WriteString("\n")
+	}
+
 	if len(result.SuspiciousFiles) > 0 {
 		buf.WriteString("## Suspicious Files\n\n")
 		buf.WriteString("Files with potentially problematic extensions or characteristics:\n\n")
@@ -163,6 +197,7 @@ func (mf *MarkdownFormatter) Format(result *analysis.AnalysisResult, cfg *config
 	buf.WriteString(fmt.Sprintf("- Radarr Grace: %d hours\n", cfg.Radarr.GraceHours))
 	buf.WriteString(fmt.Sprintf("- qBittorrent Grace: %d hours\n", cfg.Qbittorrent.GraceHours))
 	buf.WriteString(fmt.Sprintf("- Media Root: `%s`\n", cfg.Paths.MediaRoot))
+	buf.WriteString(fmt.Sprintf("- Torrent Root: `%s`\n", cfg.Paths.TorrentRoot))
 
 	if len(cfg.PathMappings) > 0 {
 		buf.WriteString("\n### Path Mappings\n\n")

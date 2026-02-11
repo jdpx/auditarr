@@ -5,9 +5,10 @@ import "time"
 type MediaClassification string
 
 const (
-	MediaHealthy MediaClassification = "healthy"
-	MediaAtRisk  MediaClassification = "at_risk"
-	MediaOrphan  MediaClassification = "orphan"
+	MediaHealthy          MediaClassification = "healthy"
+	MediaAtRisk           MediaClassification = "at_risk"
+	MediaOrphan           MediaClassification = "orphan"
+	MediaOrphanedDownload MediaClassification = "orphaned_download"
 )
 
 type ClassifiedMedia struct {

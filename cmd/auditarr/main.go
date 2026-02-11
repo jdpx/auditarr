@@ -64,7 +64,7 @@ func runScan(args []string) {
 		fmt.Println("Starting media audit...")
 	}
 
-	fsCollector := collectors.NewFilesystemCollector(cfg.Paths.MediaRoot)
+	fsCollector := collectors.NewFilesystemCollector(cfg.Paths.MediaRoot, cfg.Paths.TorrentRoot)
 
 	if *verbose {
 		fmt.Println("Collecting filesystem data...")
@@ -84,7 +84,7 @@ func runScan(args []string) {
 		if *verbose {
 			fmt.Println("Collecting permission data...")
 		}
-		permissions, err = utils.CollectPermissions(cfg.Paths.MediaRoot, cfg.Permissions.SkipPaths)
+		permissions, err = utils.CollectPermissions(cfg.Paths.MediaRoot, cfg.Paths.TorrentRoot, cfg.Permissions.SkipPaths)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to collect permission data: %v\n", err)
 		} else if *verbose {
@@ -204,14 +204,15 @@ func runScan(args []string) {
 	}
 
 	fmt.Printf("Audit complete in %.2f seconds\n", duration.Seconds())
-	fmt.Printf("Results: %d healthy, %d at risk, %d orphaned, %d suspicious\n",
+	fmt.Printf("Results: %d healthy, %d at risk, %d orphaned media, %d orphaned downloads, %d suspicious\n",
 		result.Summary.HealthyCount,
 		result.Summary.AtRiskCount,
 		result.Summary.OrphanCount,
+		result.Summary.OrphanedDownloadCount,
 		result.Summary.SuspiciousCount,
 	)
 
-	if result.Summary.OrphanCount > 0 || result.Summary.AtRiskCount > 0 {
+	if result.Summary.OrphanCount > 0 || result.Summary.AtRiskCount > 0 || result.Summary.OrphanedDownloadCount > 0 {
 		os.Exit(2)
 	}
 }

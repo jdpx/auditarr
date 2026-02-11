@@ -18,12 +18,14 @@ type Collector interface {
 }
 
 type FilesystemCollector struct {
-	mediaRoot string
+	mediaRoot   string
+	torrentRoot string
 }
 
-func NewFilesystemCollector(mediaRoot string) *FilesystemCollector {
+func NewFilesystemCollector(mediaRoot, torrentRoot string) *FilesystemCollector {
 	return &FilesystemCollector{
-		mediaRoot: mediaRoot,
+		mediaRoot:   mediaRoot,
+		torrentRoot: torrentRoot,
 	}
 }
 
@@ -32,17 +34,35 @@ func (fc *FilesystemCollector) Name() string {
 }
 
 func (fc *FilesystemCollector) Collect(ctx context.Context) ([]models.MediaFile, error) {
+	var allFiles []models.MediaFile
+
+	if fc.mediaRoot != "" {
+		mediaFiles, err := fc.collectFromPath(ctx, fc.mediaRoot, models.MediaSourceLibrary)
+		if err != nil {
+			return nil, fmt.Errorf("failed to collect from media root: %w", err)
+		}
+		allFiles = append(allFiles, mediaFiles...)
+	}
+
+	if fc.torrentRoot != "" {
+		torrentFiles, err := fc.collectFromPath(ctx, fc.torrentRoot, models.MediaSourceTorrent)
+		if err != nil {
+			return nil, fmt.Errorf("failed to collect from torrent root: %w", err)
+		}
+		allFiles = append(allFiles, torrentFiles...)
+	}
+
+	return allFiles, nil
+}
+
+func (fc *FilesystemCollector) collectFromPath(ctx context.Context, root string, source models.MediaFileSource) ([]models.MediaFile, error) {
 	var files []models.MediaFile
 
-	if fc.mediaRoot == "" {
-		return files, fmt.Errorf("media root not configured")
+	if _, err := os.Stat(root); os.IsNotExist(err) {
+		return files, fmt.Errorf("root does not exist: %s", root)
 	}
 
-	if _, err := os.Stat(fc.mediaRoot); os.IsNotExist(err) {
-		return files, fmt.Errorf("media root does not exist: %s", fc.mediaRoot)
-	}
-
-	err := filepath.WalkDir(fc.mediaRoot, func(path string, d os.DirEntry, err error) error {
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			if os.IsPermission(err) {
 				fmt.Fprintf(os.Stderr, "Warning: permission denied: %s\n", path)
@@ -90,13 +110,14 @@ func (fc *FilesystemCollector) Collect(ctx context.Context) ([]models.MediaFile,
 			ModTime:       info.ModTime(),
 			HardlinkCount: hardlinkCount,
 			IsHardlinked:  hardlinkCount > 1,
+			Source:        source,
 		})
 
 		return nil
 	})
 
 	if err != nil {
-		return files, fmt.Errorf("failed to walk media root: %w", err)
+		return files, fmt.Errorf("failed to walk root: %w", err)
 	}
 
 	return files, nil

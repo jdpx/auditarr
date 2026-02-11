@@ -29,14 +29,15 @@ type ServiceStatus struct {
 }
 
 type SummaryStats struct {
-	TotalFiles         int
-	HealthyCount       int
-	AtRiskCount        int
-	OrphanCount        int
-	SuspiciousCount    int
-	PermissionErrors   int
-	PermissionWarnings int
-	Duration           time.Duration
+	TotalFiles            int
+	HealthyCount          int
+	AtRiskCount           int
+	OrphanCount           int
+	OrphanedDownloadCount int
+	SuspiciousCount       int
+	PermissionErrors      int
+	PermissionWarnings    int
+	Duration              time.Duration
 }
 
 type Engine struct {
@@ -102,7 +103,15 @@ func (e *Engine) Analyze(
 		arrFile := arrLookup[lookupKey]
 		graceHours := e.getGraceHours(arrFile)
 
-		classification, shouldInclude := ClassifyMedia(media, arrFile, graceHours)
+		var classification models.MediaClassification
+		var shouldInclude bool
+
+		if media.Source == models.MediaSourceTorrent {
+			classification, shouldInclude = ClassifyTorrentFile(media, arrFile, graceHours)
+		} else {
+			classification, shouldInclude = ClassifyMedia(media, arrFile, graceHours)
+		}
+
 		if !shouldInclude {
 			continue
 		}
@@ -132,6 +141,8 @@ func (e *Engine) Analyze(
 			result.Summary.AtRiskCount++
 		} else if classification == models.MediaOrphan {
 			result.Summary.OrphanCount++
+		} else if classification == models.MediaOrphanedDownload {
+			result.Summary.OrphanedDownloadCount++
 		}
 		result.Summary.TotalFiles++
 	}
@@ -243,6 +254,8 @@ func getReason(class models.MediaClassification, media models.MediaFile, arrFile
 		return "Tracked by Arr but NOT hardlinked (no torrent protection)"
 	case models.MediaOrphan:
 		return "Not tracked by Arr (outside grace window)"
+	case models.MediaOrphanedDownload:
+		return "Orphaned download: in torrent dir, not hardlinked, not tracked by Arr"
 	default:
 		return "Unknown classification"
 	}

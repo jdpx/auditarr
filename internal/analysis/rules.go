@@ -27,3 +27,27 @@ func ClassifyMedia(
 
 	return models.MediaAtRisk, true
 }
+
+func ClassifyTorrentFile(
+	media models.MediaFile,
+	arrFile *models.ArrFile,
+	graceHours int,
+) (models.MediaClassification, bool) {
+	if graceHours <= 0 {
+		graceHours = 0
+	}
+
+	if media.WithinGraceWindow(graceHours) {
+		return "", false
+	}
+
+	if media.IsHardlinked {
+		return models.MediaHealthy, true
+	}
+
+	if arrFile == nil {
+		return models.MediaOrphanedDownload, true
+	}
+
+	return models.MediaHealthy, true
+}
