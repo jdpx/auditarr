@@ -93,14 +93,20 @@ func runScan(args []string) {
 	}
 
 	var sonarrFiles, radarrFiles []models.ArrFile
+	var connectionStatus []analysis.ServiceStatus
 
 	if cfg.Sonarr.URL != "" {
 		sonarrCollector := collectors.NewSonarrCollector(cfg.Sonarr.URL, cfg.Sonarr.APIKey)
+		sonarrStatus := analysis.ServiceStatus{Name: "Sonarr", Enabled: true}
 		if err := sonarrCollector.TestConnection(ctx); err != nil {
+			sonarrStatus.OK = false
+			sonarrStatus.Error = err.Error()
 			fmt.Fprintf(os.Stderr, "[SONARR] Connection failed: %v\n", err)
 		} else {
+			sonarrStatus.OK = true
 			fmt.Println("[SONARR] Connected successfully")
 		}
+		connectionStatus = append(connectionStatus, sonarrStatus)
 		if *verbose {
 			fmt.Println("Collecting Sonarr data...")
 		}
@@ -114,11 +120,16 @@ func runScan(args []string) {
 
 	if cfg.Radarr.URL != "" {
 		radarrCollector := collectors.NewRadarrCollector(cfg.Radarr.URL, cfg.Radarr.APIKey)
+		radarrStatus := analysis.ServiceStatus{Name: "Radarr", Enabled: true}
 		if err := radarrCollector.TestConnection(ctx); err != nil {
+			radarrStatus.OK = false
+			radarrStatus.Error = err.Error()
 			fmt.Fprintf(os.Stderr, "[RADARR] Connection failed: %v\n", err)
 		} else {
+			radarrStatus.OK = true
 			fmt.Println("[RADARR] Connected successfully")
 		}
+		connectionStatus = append(connectionStatus, radarrStatus)
 		if *verbose {
 			fmt.Println("Collecting Radarr data...")
 		}
@@ -132,14 +143,21 @@ func runScan(args []string) {
 
 	var torrents []models.Torrent
 	if cfg.Qbittorrent.URL != "" {
+		qbStatus := analysis.ServiceStatus{Name: "qBittorrent", Enabled: true}
 		if *verbose {
 			fmt.Println("Collecting qBittorrent data...")
 		}
 		qbCollector := collectors.NewQBCollector(cfg.Qbittorrent.URL, cfg.Qbittorrent.Username, cfg.Qbittorrent.Password)
 		torrents, err = qbCollector.Collect(ctx)
 		if err != nil {
+			qbStatus.OK = false
+			qbStatus.Error = err.Error()
 			fmt.Fprintf(os.Stderr, "Warning: failed to collect qBittorrent data: %v\n", err)
-		} else if *verbose {
+		} else {
+			qbStatus.OK = true
+		}
+		connectionStatus = append(connectionStatus, qbStatus)
+		if *verbose {
 			fmt.Printf("Found %d torrents\n", len(torrents))
 		}
 	}
@@ -163,6 +181,7 @@ func runScan(args []string) {
 	)
 
 	result := engine.Analyze(mediaFiles, sonarrFiles, radarrFiles, torrents, permissions)
+	result.ConnectionStatus = connectionStatus
 
 	duration := time.Since(startTime)
 	result.Summary.Duration = duration

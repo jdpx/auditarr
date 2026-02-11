@@ -35,28 +35,20 @@ func (mf *MarkdownFormatter) Format(result *analysis.AnalysisResult, cfg *config
 	buf.WriteString(fmt.Sprintf("| Suspicious Files | %d | 🚨 | Suspicious extensions detected |\n", result.Summary.SuspiciousCount))
 	buf.WriteString("\n")
 
-	if len(result.PermissionIssues) > 0 {
-		buf.WriteString("## Permission Issues\n\n")
-
-		var criticalIssues, warningIssues []models.PermissionIssue
-		for _, issue := range result.PermissionIssues {
-			if issue.Severity == "error" {
-				criticalIssues = append(criticalIssues, issue)
-			} else {
-				warningIssues = append(warningIssues, issue)
+	if len(result.ConnectionStatus) > 0 {
+		buf.WriteString("## Service Connections\n\n")
+		buf.WriteString("| Service | Status | Details |\n")
+		buf.WriteString("|---------|--------|---------|\n")
+		for _, svc := range result.ConnectionStatus {
+			status := "✅ Connected"
+			details := "OK"
+			if !svc.OK {
+				status = "❌ Failed"
+				details = svc.Error
 			}
+			buf.WriteString(fmt.Sprintf("| %s | %s | %s |\n", svc.Name, status, escapeMarkdown(details)))
 		}
-
-		if len(warningIssues) > 0 {
-			buf.WriteString("### Warnings (Best Practice Violations)\n\n")
-			buf.WriteString("| Path | Issue | Current | Recommendation |\n")
-			buf.WriteString("|------|-------|---------|------------------|\n")
-			for _, issue := range warningIssues {
-				buf.WriteString(fmt.Sprintf("| `%s` | %s | - | %s |\n", escapeMarkdown(issue.Path), issue.Issue, issue.FixHint))
-			}
-			buf.WriteString("\n")
-		}
-
+		buf.WriteString("\n")
 	}
 
 	atRisk := filterByClassification(result.ClassifiedMedia, models.MediaAtRisk)

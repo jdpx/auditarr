@@ -215,6 +215,28 @@ Minimal external dependencies:
 3. Update Discord formatter if summary needed
 4. Update summary statistics
 
+## Code Quality
+
+### Linting and Type Checking
+
+Before committing changes, always run the following commands to ensure code quality:
+
+```bash
+# Build the project to check for compilation errors
+go build ./...
+
+# Run go vet for static analysis
+go vet ./...
+
+# Run tests
+go test ./...
+
+# Format code
+go fmt ./...
+```
+
+All changes MUST pass `go build` and `go vet` without errors before being committed.
+
 ## Troubleshooting
 
 **Permission Denied Errors**: Ensure auditarr user has read access to media paths and API endpoints.

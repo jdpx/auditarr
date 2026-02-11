@@ -16,6 +16,14 @@ type AnalysisResult struct {
 	UnlinkedTorrents []models.Torrent
 	PermissionIssues []models.PermissionIssue
 	Summary          SummaryStats
+	ConnectionStatus []ServiceStatus
+}
+
+type ServiceStatus struct {
+	Name    string
+	Enabled bool
+	OK      bool
+	Error   string
 }
 
 type SummaryStats struct {
