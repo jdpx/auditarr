@@ -93,8 +93,6 @@ func (e *Engine) Analyze(
 
 	arrLookup := e.buildArrLookup(sonarrFiles, radarrFiles)
 
-	lookupCount := 0
-	foundCount := 0
 	for _, media := range mediaFiles {
 		if shouldSkip(media.Path, e.skipPaths) {
 			continue
@@ -102,15 +100,6 @@ func (e *Engine) Analyze(
 
 		lookupKey := e.normalizePath(media.Path)
 		arrFile := arrLookup[lookupKey]
-
-		if lookupCount < 10 {
-			fmt.Fprintf(os.Stderr, "MEDIA_LOOKUP: path=%s lookup=%s found=%v\n",
-				media.Path, lookupKey, arrFile != nil)
-			lookupCount++
-		}
-		if arrFile != nil {
-			foundCount++
-		}
 		graceHours := e.getGraceHours(arrFile)
 
 		classification, shouldInclude := ClassifyMedia(media, arrFile, graceHours)
@@ -146,27 +135,11 @@ func (e *Engine) Analyze(
 		}
 		result.Summary.TotalFiles++
 	}
-	fmt.Fprintf(os.Stderr, "MEDIA_LOOKUP: Sampled %d files, found %d in Arr lookup\n", lookupCount, foundCount)
-
-	// Debug: Show first 5 lookup keys
-	count := 0
-	for k := range arrLookup {
-		if count < 5 {
-			fmt.Fprintf(os.Stderr, "ARR_LOOKUP_KEY: %s\n", k)
-			count++
-		} else {
-			break
-		}
-	}
 
 	for _, t := range torrents {
 		if t.State == models.StateCompleted && !t.WithinGraceWindow(e.qbittorrentGraceHours) {
-			matched := e.hasMatchingMediaFile(t, arrLookup)
-			if !matched {
-				fmt.Fprintf(os.Stderr, "UNLINKED: %s (hash=%s)\n", t.Name, t.Hash)
+			if !e.hasMatchingMediaFile(t, arrLookup) {
 				result.UnlinkedTorrents = append(result.UnlinkedTorrents, t)
-			} else {
-				fmt.Fprintf(os.Stderr, "LINKED: %s (hash=%s)\n", t.Name, t.Hash)
 			}
 		}
 	}
@@ -244,12 +217,9 @@ func isHardlinked(path string) bool {
 	var stat syscall.Stat_t
 	err := syscall.Stat(path, &stat)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "HARDLINK_DEBUG: stat failed for %s: %v\n", path, err)
 		return false
 	}
-	result := stat.Nlink > 1
-	fmt.Fprintf(os.Stderr, "HARDLINK_DEBUG: %s nlink=%d hardlinked=%v\n", path, stat.Nlink, result)
-	return result
+	return stat.Nlink > 1
 }
 
 func (e *Engine) normalizePath(p string) string {
