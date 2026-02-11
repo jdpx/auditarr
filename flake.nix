@@ -20,7 +20,7 @@
             src = ./.;
             
             # Hash of go modules (computed by nix)
-            vendorHash = "sha256-pbA/AlBz3cQYRTMnQ/qBPcinYOKokrBLNhkbRTq54gE=";
+            vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
             
             meta = with pkgs.lib; {
               description = "Non-destructive audit tool for Arr media libraries";
