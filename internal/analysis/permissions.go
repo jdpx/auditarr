@@ -10,6 +10,7 @@ var metadataPatterns = []string{
 	"backdrop.jpg", "backdrop.png",
 	"folder.jpg", "folder.png",
 	"logo.png",
+	"logo.svg",
 	"season*-poster.jpg", "season*-poster.png",
 	"banner.jpg", "landscape.jpg", "clearlogo.png",
 	"*.nfo",

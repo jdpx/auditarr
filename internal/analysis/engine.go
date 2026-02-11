@@ -2,6 +2,7 @@ package analysis
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -91,12 +92,17 @@ func (e *Engine) Analyze(
 
 	arrLookup := e.buildArrLookup(sonarrFiles, radarrFiles)
 
-	for _, media := range mediaFiles {
+	for i, media := range mediaFiles {
 		if shouldSkip(media.Path, e.skipPaths) {
 			continue
 		}
 
-		arrFile := arrLookup[e.normalizePath(media.Path)]
+		lookupKey := e.normalizePath(media.Path)
+		arrFile := arrLookup[lookupKey]
+		if i == 0 {
+			fmt.Fprintf(os.Stderr, "DEBUG: First media path: %s lookup=%s found=%v\n",
+				media.Path, lookupKey, arrFile != nil)
+		}
 		graceHours := e.getGraceHours(arrFile)
 
 		classification, shouldInclude := ClassifyMedia(media, arrFile, graceHours)
@@ -191,6 +197,10 @@ func (e *Engine) buildArrLookup(sonarrFiles, radarrFiles []models.ArrFile) map[s
 	for i := range radarrFiles {
 		normalizedPath := utils.NormalizePath(radarrFiles[i].Path, e.pathMappings)
 		lookup[e.normalizePath(normalizedPath)] = &radarrFiles[i]
+		if i == 0 {
+			fmt.Fprintf(os.Stderr, "DEBUG: First Radarr path: orig=%s mapped=%s lookup=%s\n",
+				radarrFiles[i].Path, normalizedPath, e.normalizePath(normalizedPath))
+		}
 	}
 	return lookup
 }
