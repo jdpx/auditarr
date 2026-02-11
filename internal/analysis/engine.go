@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/jdpx/auditarr/internal/models"
@@ -208,12 +209,26 @@ func (e *Engine) buildArrLookup(sonarrFiles, radarrFiles []models.ArrFile) map[s
 func (e *Engine) hasMatchingMediaFile(t models.Torrent, mediaLookup map[string]*models.ArrFile) bool {
 	for _, f := range t.Files {
 		fullPath := filepath.Join(t.SavePath, f)
+
+		if isHardlinked(fullPath) {
+			return true
+		}
+
 		normalizedPath := utils.NormalizePath(fullPath, e.pathMappings)
 		if _, exists := mediaLookup[e.normalizePath(normalizedPath)]; exists {
 			return true
 		}
 	}
 	return false
+}
+
+func isHardlinked(path string) bool {
+	var stat syscall.Stat_t
+	err := syscall.Stat(path, &stat)
+	if err != nil {
+		return false
+	}
+	return stat.Nlink > 1
 }
 
 func (e *Engine) normalizePath(p string) string {

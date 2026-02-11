@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"syscall"
 
@@ -91,11 +92,20 @@ func NormalizePath(path string, mappings map[string]string) string {
 
 	normalized := filepath.Clean(path)
 
-	for apiPath, fsPath := range mappings {
+	var sortedPaths []string
+	for apiPath := range mappings {
+		sortedPaths = append(sortedPaths, apiPath)
+	}
+
+	sort.Slice(sortedPaths, func(i, j int) bool {
+		return len(sortedPaths[i]) > len(sortedPaths[j])
+	})
+
+	for _, apiPath := range sortedPaths {
 		apiPathClean := filepath.Clean(apiPath)
 		if strings.HasPrefix(normalized, apiPathClean) {
 			relative := strings.TrimPrefix(normalized, apiPathClean)
-			normalized = filepath.Join(fsPath, relative)
+			normalized = filepath.Join(mappings[apiPath], relative)
 			break
 		}
 	}

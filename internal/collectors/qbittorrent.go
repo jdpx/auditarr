@@ -74,6 +74,7 @@ func (qbc *QBCollector) Collect(ctx context.Context) ([]models.Torrent, error) {
 			Hash:        t.Hash,
 			Name:        t.Name,
 			SavePath:    t.SavePath,
+			Size:        t.Size,
 			State:       mapQBState(t.State),
 			CompletedOn: completedOn,
 			Files:       files,
@@ -231,6 +232,7 @@ type qbTorrent struct {
 	Name         string `json:"name"`
 	State        string `json:"state"`
 	SavePath     string `json:"save_path"`
+	Size         int64  `json:"size"`
 	CompletionOn int64  `json:"completion_on"`
 }
 

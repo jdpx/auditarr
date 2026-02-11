@@ -69,6 +69,7 @@ func (c *Config) applyDefaultPathMappings() {
 
 	if c.Paths.TorrentRoot != "" {
 		c.PathMappings["/data/torrents"] = c.Paths.TorrentRoot
+		c.PathMappings["/data/"] = c.Paths.TorrentRoot
 	}
 }
 

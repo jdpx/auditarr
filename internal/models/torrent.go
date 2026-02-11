@@ -16,6 +16,7 @@ type Torrent struct {
 	Hash        string
 	Name        string
 	SavePath    string
+	Size        int64
 	State       TorrentState
 	CompletedOn time.Time
 	Files       []string

@@ -12,6 +12,7 @@ import (
 	"github.com/jdpx/auditarr/internal/analysis"
 	"github.com/jdpx/auditarr/internal/config"
 	"github.com/jdpx/auditarr/internal/models"
+	"github.com/jdpx/auditarr/internal/utils"
 )
 
 type MarkdownFormatter struct{}
@@ -82,6 +83,10 @@ func (mf *MarkdownFormatter) Format(result *analysis.AnalysisResult, cfg *config
 
 	orphans := filterByClassification(result.ClassifiedMedia, models.MediaOrphan)
 	if len(orphans) > 0 {
+		var totalSize int64
+		for _, cm := range orphans {
+			totalSize += cm.File.Size
+		}
 		buf.WriteString("## Orphaned Media\n\n")
 		buf.WriteString("Media files found on disk that are not tracked by Sonarr or Radarr:\n\n")
 		buf.WriteString("**What this checks**: Compares filesystem contents against Sonarr/Radarr API to find files that exist in your media directories but aren't registered in the Arr databases.\n\n")
@@ -91,14 +96,15 @@ func (mf *MarkdownFormatter) Format(result *analysis.AnalysisResult, cfg *config
 		buf.WriteString("- Media that was deleted from Sonarr/Radarr but not from disk\n")
 		buf.WriteString("- Test files or incomplete imports\n\n")
 		buf.WriteString("**Grace window**: Files newer than the configured grace hours are excluded to avoid false positives during active imports.\n\n")
-		buf.WriteString("| Path | Age |\n")
-		buf.WriteString("|------|-----|\n")
+		buf.WriteString(fmt.Sprintf("**Total Size**: %s\n\n", formatBytes(totalSize)))
+		buf.WriteString("| Path | Age | Size |\n")
+		buf.WriteString("|------|-----|------|\n")
 		sort.Slice(orphans, func(i, j int) bool {
 			return orphans[i].File.Path < orphans[j].File.Path
 		})
 		for _, cm := range orphans {
 			age := time.Since(cm.File.ModTime)
-			buf.WriteString(fmt.Sprintf("| `%s` | %s |\n", escapeMarkdown(cm.File.Path), formatDuration(age)))
+			buf.WriteString(fmt.Sprintf("| `%s` | %s | %s |\n", escapeMarkdown(cm.File.Path), formatDuration(age), formatBytes(cm.File.Size)))
 		}
 		buf.WriteString("\n")
 	}
@@ -124,12 +130,17 @@ func (mf *MarkdownFormatter) Format(result *analysis.AnalysisResult, cfg *config
 	}
 
 	if len(result.UnlinkedTorrents) > 0 {
+		var totalSize int64
+		for _, t := range result.UnlinkedTorrents {
+			totalSize += t.Size
+		}
 		buf.WriteString("## Unlinked Torrents\n\n")
 		buf.WriteString("Completed torrents with no matching media:\n\n")
 		buf.WriteString("**What this checks**: Torrents marked as completed in qBittorrent that have no corresponding hardlinked files in your media directories.\n\n")
 		buf.WriteString("**Why this matters**: These torrents are consuming disk space in your download directory but aren't properly imported into your media library. The torrent files exist at the location below but aren't linked to Arr-managed media.\n\n")
-		buf.WriteString("| Full Path | Completed |\n")
-		buf.WriteString("|-----------|-----------|\n")
+		buf.WriteString(fmt.Sprintf("**Total Size**: %s\n\n", formatBytes(totalSize)))
+		buf.WriteString("| Full Path | Completed | Size |\n")
+		buf.WriteString("|-----------|-----------|------|\n")
 		sort.Slice(result.UnlinkedTorrents, func(i, j int) bool {
 			pathI := filepath.Join(result.UnlinkedTorrents[i].SavePath, result.UnlinkedTorrents[i].Name)
 			pathJ := filepath.Join(result.UnlinkedTorrents[j].SavePath, result.UnlinkedTorrents[j].Name)
@@ -141,7 +152,8 @@ func (mf *MarkdownFormatter) Format(result *analysis.AnalysisResult, cfg *config
 				completed = formatDuration(time.Since(t.CompletedOn)) + " ago"
 			}
 			fullPath := filepath.Join(t.SavePath, t.Name)
-			buf.WriteString(fmt.Sprintf("| `%s` | %s |\n", escapeMarkdown(fullPath), completed))
+			displayPath := utils.NormalizePath(fullPath, cfg.PathMappings)
+			buf.WriteString(fmt.Sprintf("| `%s` | %s | %s |\n", escapeMarkdown(displayPath), completed, formatBytes(t.Size)))
 		}
 		buf.WriteString("\n")
 	}
@@ -207,4 +219,26 @@ func formatDuration(d time.Duration) string {
 		return fmt.Sprintf("%d days", int(d.Hours()/24))
 	}
 	return fmt.Sprintf("%d months", int(d.Hours()/24/30))
+}
+
+func formatBytes(b int64) string {
+	const (
+		KB = 1024
+		MB = 1024 * KB
+		GB = 1024 * MB
+		TB = 1024 * GB
+	)
+
+	switch {
+	case b >= TB:
+		return fmt.Sprintf("%.2f TB", float64(b)/float64(TB))
+	case b >= GB:
+		return fmt.Sprintf("%.2f GB", float64(b)/float64(GB))
+	case b >= MB:
+		return fmt.Sprintf("%.2f MB", float64(b)/float64(MB))
+	case b >= KB:
+		return fmt.Sprintf("%.2f KB", float64(b)/float64(KB))
+	default:
+		return fmt.Sprintf("%d B", b)
+	}
 }
