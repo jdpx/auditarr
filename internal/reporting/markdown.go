@@ -33,7 +33,6 @@ func (mf *MarkdownFormatter) Format(result *analysis.AnalysisResult, cfg *config
 	buf.WriteString(fmt.Sprintf("| At Risk | %d | ⚠️ | Tracked by Arr but NOT hardlinked (no torrent protection) |\n", result.Summary.AtRiskCount))
 	buf.WriteString(fmt.Sprintf("| Orphaned | %d | ❌ | Not tracked by Arr (outside grace window) |\n", result.Summary.OrphanCount))
 	buf.WriteString(fmt.Sprintf("| Suspicious Files | %d | 🚨 | Suspicious extensions detected |\n", result.Summary.SuspiciousCount))
-	buf.WriteString(fmt.Sprintf("| Permission Issues | %d | ⚠️ | Files with incorrect permissions |\n", result.Summary.PermissionErrors+result.Summary.PermissionWarnings))
 	buf.WriteString("\n")
 
 	if len(result.PermissionIssues) > 0 {
@@ -48,16 +47,6 @@ func (mf *MarkdownFormatter) Format(result *analysis.AnalysisResult, cfg *config
 			}
 		}
 
-		if len(criticalIssues) > 0 {
-			buf.WriteString("### Critical (Prevents Hardlinks)\n\n")
-			buf.WriteString("| Path | Issue | Current | Fix Command |\n")
-			buf.WriteString("|------|-------|---------|-------------|\n")
-			for _, issue := range criticalIssues {
-				buf.WriteString(fmt.Sprintf("| `%s` | %s | - | %s |\n", escapeMarkdown(issue.Path), issue.Issue, issue.FixHint))
-			}
-			buf.WriteString("\n")
-		}
-
 		if len(warningIssues) > 0 {
 			buf.WriteString("### Warnings (Best Practice Violations)\n\n")
 			buf.WriteString("| Path | Issue | Current | Recommendation |\n")
@@ -68,11 +57,6 @@ func (mf *MarkdownFormatter) Format(result *analysis.AnalysisResult, cfg *config
 			buf.WriteString("\n")
 		}
 
-		buf.WriteString("### Permission Audit Summary\n")
-		buf.WriteString(fmt.Sprintf("- Files checked: %d\n", result.Summary.TotalFiles))
-		buf.WriteString(fmt.Sprintf("- Critical issues: %d (affect hardlink functionality)\n", result.Summary.PermissionErrors))
-		buf.WriteString(fmt.Sprintf("- Warnings: %d (best practice violations)\n", result.Summary.PermissionWarnings))
-		buf.WriteString(fmt.Sprintf("- All clear: %d files\n\n", result.Summary.TotalFiles-result.Summary.PermissionErrors-result.Summary.PermissionWarnings))
 	}
 
 	atRisk := filterByClassification(result.ClassifiedMedia, models.MediaAtRisk)
