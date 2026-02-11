@@ -30,6 +30,36 @@ func (rc *RadarrCollector) Name() string {
 	return "radarr"
 }
 
+func (rc *RadarrCollector) TestConnection(ctx context.Context) error {
+	if rc.baseURL == "" {
+		return fmt.Errorf("radarr URL not configured")
+	}
+
+	url := fmt.Sprintf("%s/api/v3/system/status", rc.baseURL)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("X-Api-Key", rc.apiKey)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := rc.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("connection failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("authentication failed (invalid API key)")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("API returned status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
 func (rc *RadarrCollector) Collect(ctx context.Context) ([]models.ArrFile, error) {
 	if rc.baseURL == "" {
 		return nil, nil

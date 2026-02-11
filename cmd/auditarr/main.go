@@ -95,10 +95,15 @@ func runScan(args []string) {
 	var sonarrFiles, radarrFiles []models.ArrFile
 
 	if cfg.Sonarr.URL != "" {
+		sonarrCollector := collectors.NewSonarrCollector(cfg.Sonarr.URL, cfg.Sonarr.APIKey)
+		if err := sonarrCollector.TestConnection(ctx); err != nil {
+			fmt.Fprintf(os.Stderr, "[SONARR] Connection failed: %v\n", err)
+		} else {
+			fmt.Println("[SONARR] Connected successfully")
+		}
 		if *verbose {
 			fmt.Println("Collecting Sonarr data...")
 		}
-		sonarrCollector := collectors.NewSonarrCollector(cfg.Sonarr.URL, cfg.Sonarr.APIKey)
 		sonarrFiles, err = sonarrCollector.Collect(ctx)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to collect Sonarr data: %v\n", err)
@@ -108,10 +113,15 @@ func runScan(args []string) {
 	}
 
 	if cfg.Radarr.URL != "" {
+		radarrCollector := collectors.NewRadarrCollector(cfg.Radarr.URL, cfg.Radarr.APIKey)
+		if err := radarrCollector.TestConnection(ctx); err != nil {
+			fmt.Fprintf(os.Stderr, "[RADARR] Connection failed: %v\n", err)
+		} else {
+			fmt.Println("[RADARR] Connected successfully")
+		}
 		if *verbose {
 			fmt.Println("Collecting Radarr data...")
 		}
-		radarrCollector := collectors.NewRadarrCollector(cfg.Radarr.URL, cfg.Radarr.APIKey)
 		radarrFiles, err = radarrCollector.Collect(ctx)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to collect Radarr data: %v\n", err)

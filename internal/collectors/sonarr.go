@@ -30,6 +30,36 @@ func (sc *SonarrCollector) Name() string {
 	return "sonarr"
 }
 
+func (sc *SonarrCollector) TestConnection(ctx context.Context) error {
+	if sc.baseURL == "" {
+		return fmt.Errorf("sonarr URL not configured")
+	}
+
+	url := fmt.Sprintf("%s/api/v3/system/status", sc.baseURL)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("X-Api-Key", sc.apiKey)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := sc.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("connection failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("authentication failed (invalid API key)")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("API returned status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
 func (sc *SonarrCollector) Collect(ctx context.Context) ([]models.ArrFile, error) {
 	if sc.baseURL == "" {
 		return nil, nil
