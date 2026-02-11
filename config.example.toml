@@ -5,6 +5,14 @@
 media_root = "/mnt/media-arr/media"
 torrent_root = "/mnt/media-arr/torrents"
 
+# Path mappings: Convert API paths (from Arr apps) to filesystem paths
+# Use this when Radarr/Sonarr are in containers with different mount points
+# Format: "api_path" = "filesystem_path"
+[path_mappings]
+# Example: Radarr in container sees "/data/media", but host sees "/mnt/media-arr/media"
+# "/data/media" = "/mnt/media-arr/media"
+# "/data/torrents" = "/mnt/media-arr/torrents"
+
 [sonarr]
 url = "http://localhost:8989"
 api_key = "your-api-key-here"

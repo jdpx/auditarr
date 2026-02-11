@@ -15,6 +15,7 @@ type Config struct {
 	Outputs       OutputConfig       `toml:"outputs"`
 	Suspicious    SuspiciousConfig   `toml:"suspicious"`
 	Permissions   PermissionsConfig  `toml:"permissions"`
+	PathMappings  map[string]string  `toml:"path_mappings"`
 }
 
 type PathsConfig struct {

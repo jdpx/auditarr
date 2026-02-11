@@ -83,3 +83,41 @@ func IsSubtitleFile(path string) bool {
 	}
 	return false
 }
+
+func NormalizePath(path string, mappings map[string]string) string {
+	if mappings == nil || len(mappings) == 0 {
+		return filepath.Clean(path)
+	}
+
+	normalized := filepath.Clean(path)
+
+	for apiPath, fsPath := range mappings {
+		apiPathClean := filepath.Clean(apiPath)
+		if strings.HasPrefix(normalized, apiPathClean) {
+			relative := strings.TrimPrefix(normalized, apiPathClean)
+			normalized = filepath.Join(fsPath, relative)
+			break
+		}
+	}
+
+	return normalized
+}
+
+func NormalizePathReverse(path string, mappings map[string]string) string {
+	if mappings == nil || len(mappings) == 0 {
+		return filepath.Clean(path)
+	}
+
+	normalized := filepath.Clean(path)
+
+	for apiPath, fsPath := range mappings {
+		fsPathClean := filepath.Clean(fsPath)
+		if strings.HasPrefix(normalized, fsPathClean) {
+			relative := strings.TrimPrefix(normalized, fsPathClean)
+			normalized = filepath.Join(apiPath, relative)
+			break
+		}
+	}
+
+	return normalized
+}

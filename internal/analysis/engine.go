@@ -49,6 +49,7 @@ type Engine struct {
 	sgidPaths             []string
 	skipPaths             []string
 	nonstandardSeverity   string
+	pathMappings          map[string]string
 }
 
 func NewEngine(
@@ -61,6 +62,7 @@ func NewEngine(
 	permSGIDPaths []string,
 	permSkipPaths []string,
 	permNonstandardSeverity string,
+	pathMappings map[string]string,
 ) *Engine {
 	return &Engine{
 		sonarrGraceHours:      sonarrGrace,
@@ -74,6 +76,7 @@ func NewEngine(
 		sgidPaths:             permSGIDPaths,
 		skipPaths:             permSkipPaths,
 		nonstandardSeverity:   permNonstandardSeverity,
+		pathMappings:          pathMappings,
 	}
 }
 
@@ -86,14 +89,14 @@ func (e *Engine) Analyze(
 ) *AnalysisResult {
 	result := &AnalysisResult{}
 
-	arrLookup := buildArrLookup(sonarrFiles, radarrFiles)
+	arrLookup := e.buildArrLookup(sonarrFiles, radarrFiles)
 
 	for _, media := range mediaFiles {
 		if shouldSkip(media.Path, e.skipPaths) {
 			continue
 		}
 
-		arrFile := arrLookup[normalizePath(media.Path)]
+		arrFile := arrLookup[e.normalizePath(media.Path)]
 		graceHours := e.getGraceHours(arrFile)
 
 		classification, shouldInclude := ClassifyMedia(media, arrFile, graceHours)
@@ -140,7 +143,7 @@ func (e *Engine) Analyze(
 
 	for _, t := range torrents {
 		if t.State == models.StateCompleted && !t.WithinGraceWindow(e.qbittorrentGraceHours) {
-			if !hasMatchingMediaFile(t, arrLookup) {
+			if !e.hasMatchingMediaFile(t, arrLookup) {
 				result.UnlinkedTorrents = append(result.UnlinkedTorrents, t)
 			}
 		}
@@ -179,28 +182,31 @@ func (e *Engine) getGraceHours(arrFile *models.ArrFile) int {
 	return 0
 }
 
-func buildArrLookup(sonarrFiles, radarrFiles []models.ArrFile) map[string]*models.ArrFile {
+func (e *Engine) buildArrLookup(sonarrFiles, radarrFiles []models.ArrFile) map[string]*models.ArrFile {
 	lookup := make(map[string]*models.ArrFile)
 	for i := range sonarrFiles {
-		lookup[normalizePath(sonarrFiles[i].Path)] = &sonarrFiles[i]
+		normalizedPath := utils.NormalizePath(sonarrFiles[i].Path, e.pathMappings)
+		lookup[e.normalizePath(normalizedPath)] = &sonarrFiles[i]
 	}
 	for i := range radarrFiles {
-		lookup[normalizePath(radarrFiles[i].Path)] = &radarrFiles[i]
+		normalizedPath := utils.NormalizePath(radarrFiles[i].Path, e.pathMappings)
+		lookup[e.normalizePath(normalizedPath)] = &radarrFiles[i]
 	}
 	return lookup
 }
 
-func hasMatchingMediaFile(t models.Torrent, mediaLookup map[string]*models.ArrFile) bool {
+func (e *Engine) hasMatchingMediaFile(t models.Torrent, mediaLookup map[string]*models.ArrFile) bool {
 	for _, f := range t.Files {
 		fullPath := filepath.Join(t.SavePath, f)
-		if _, exists := mediaLookup[normalizePath(fullPath)]; exists {
+		normalizedPath := utils.NormalizePath(fullPath, e.pathMappings)
+		if _, exists := mediaLookup[e.normalizePath(normalizedPath)]; exists {
 			return true
 		}
 	}
 	return false
 }
 
-func normalizePath(p string) string {
+func (e *Engine) normalizePath(p string) string {
 	return strings.ToLower(filepath.Clean(p))
 }
 
