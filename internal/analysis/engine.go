@@ -210,7 +210,13 @@ func (e *Engine) hasMatchingMediaFile(t models.Torrent, mediaLookup map[string]*
 	for _, f := range t.Files {
 		fullPath := filepath.Join(t.SavePath, f)
 
-		if isHardlinked(fullPath) {
+		hardlinked, nlink, err := isHardlinkedWithDetails(fullPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "DEBUG: torrent=%s file=%s path=%s stat_error=%v\n", t.Name, f, fullPath, err)
+		} else {
+			fmt.Fprintf(os.Stderr, "DEBUG: torrent=%s file=%s path=%s hardlinked=%v nlink=%d\n", t.Name, f, fullPath, hardlinked, nlink)
+		}
+		if hardlinked {
 			return true
 		}
 
@@ -222,13 +228,13 @@ func (e *Engine) hasMatchingMediaFile(t models.Torrent, mediaLookup map[string]*
 	return false
 }
 
-func isHardlinked(path string) bool {
+func isHardlinkedWithDetails(path string) (bool, uint64, error) {
 	var stat syscall.Stat_t
 	err := syscall.Stat(path, &stat)
 	if err != nil {
-		return false
+		return false, 0, err
 	}
-	return stat.Nlink > 1
+	return stat.Nlink > 1, uint64(stat.Nlink), nil
 }
 
 func (e *Engine) normalizePath(p string) string {
