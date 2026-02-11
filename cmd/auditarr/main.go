@@ -38,6 +38,7 @@ func runScan(args []string) {
 	fs := flag.NewFlagSet("scan", flag.ExitOnError)
 	configPath := fs.String("config", "/etc/auditarr/config.toml", "Path to configuration file")
 	verbose := fs.Bool("verbose", false, "Enable verbose output")
+	skipPermissions := fs.Bool("skip-permissions", false, "Skip permission auditing")
 	_ = fs.Parse(args)
 
 	cfg, err := config.Load(*configPath)
@@ -79,7 +80,7 @@ func runScan(args []string) {
 	}
 
 	var permissions []models.FilePermissions
-	if cfg.Permissions.Enabled {
+	if cfg.Permissions.Enabled && !*skipPermissions {
 		if *verbose {
 			fmt.Println("Collecting permission data...")
 		}
@@ -143,7 +144,7 @@ func runScan(args []string) {
 		cfg.Qbittorrent.GraceHours,
 		cfg.Suspicious.Extensions,
 		cfg.Suspicious.FlagArchives,
-		cfg.Permissions.Enabled,
+		cfg.Permissions.Enabled && !*skipPermissions,
 		cfg.Permissions.GroupGID,
 		cfg.Permissions.AllowedUIDs,
 		cfg.Permissions.SGIDPaths,

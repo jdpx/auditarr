@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jdpx/auditarr/internal/models"
+	"github.com/jdpx/auditarr/internal/utils"
 )
 
 type AnalysisResult struct {
@@ -89,6 +90,10 @@ func (e *Engine) Analyze(
 
 		classification, shouldInclude := ClassifyMedia(media, arrFile, graceHours)
 		if !shouldInclude {
+			continue
+		}
+
+		if classification == models.MediaOrphan && utils.IsSubtitleFile(media.Path) {
 			continue
 		}
 

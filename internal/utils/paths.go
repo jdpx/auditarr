@@ -72,3 +72,14 @@ func IsMediaFile(path string) bool {
 	}
 	return false
 }
+
+func IsSubtitleFile(path string) bool {
+	ext := strings.ToLower(filepath.Ext(path))
+	subtitleExts := []string{".srt", ".ass", ".ssa", ".vtt", ".sub", ".idx", ".pgs"}
+	for _, se := range subtitleExts {
+		if ext == se {
+			return true
+		}
+	}
+	return false
+}
