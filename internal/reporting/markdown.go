@@ -38,6 +38,37 @@ func (mf *MarkdownFormatter) Format(result *analysis.AnalysisResult, cfg *config
 	buf.WriteString(fmt.Sprintf("| Suspicious Files | %d | 🚨 | Suspicious extensions detected |\n", result.Summary.SuspiciousCount))
 	buf.WriteString("\n")
 
+	healthy := filterByClassification(result.ClassifiedMedia, models.MediaHealthy)
+	atRisk := filterByClassification(result.ClassifiedMedia, models.MediaAtRisk)
+	orphans := filterByClassification(result.ClassifiedMedia, models.MediaOrphan)
+	orphanedDownloads := filterByClassification(result.ClassifiedMedia, models.MediaOrphanedDownload)
+
+	var totalHealthySize, totalAtRiskSize, totalOrphanSize, totalOrphanedDownloadSize int64
+	for _, cm := range healthy {
+		totalHealthySize += cm.File.Size
+	}
+	for _, cm := range atRisk {
+		totalAtRiskSize += cm.File.Size
+	}
+	for _, cm := range orphans {
+		totalOrphanSize += cm.File.Size
+	}
+	for _, cm := range orphanedDownloads {
+		totalOrphanedDownloadSize += cm.File.Size
+	}
+
+	totalMediaSize := totalHealthySize + totalAtRiskSize + totalOrphanSize
+
+	buf.WriteString("## Total Media Size\n\n")
+	buf.WriteString("| Category | Size |\n")
+	buf.WriteString("|----------|------|\n")
+	buf.WriteString(fmt.Sprintf("| **Total Library Size** | **%s** |\n", formatBytes(totalMediaSize)))
+	buf.WriteString(fmt.Sprintf("| Healthy Media | %s |\n", formatBytes(totalHealthySize)))
+	buf.WriteString(fmt.Sprintf("| At Risk | %s |\n", formatBytes(totalAtRiskSize)))
+	buf.WriteString(fmt.Sprintf("| Orphaned Media | %s |\n", formatBytes(totalOrphanSize)))
+	buf.WriteString(fmt.Sprintf("| Orphaned Downloads | %s |\n", formatBytes(totalOrphanedDownloadSize)))
+	buf.WriteString("\n")
+
 	if len(result.ConnectionStatus) > 0 {
 		buf.WriteString("## Service Connections\n\n")
 		buf.WriteString("Connection status of all configured Arr services and download clients:\n\n")
@@ -61,7 +92,6 @@ func (mf *MarkdownFormatter) Format(result *analysis.AnalysisResult, cfg *config
 		buf.WriteString("\n")
 	}
 
-	atRisk := filterByClassification(result.ClassifiedMedia, models.MediaAtRisk)
 	if len(atRisk) > 0 {
 		buf.WriteString("## At Risk Media\n\n")
 		buf.WriteString("Files tracked by Sonarr/Radarr but not hardlinked to torrent downloads:\n\n")
@@ -82,11 +112,10 @@ func (mf *MarkdownFormatter) Format(result *analysis.AnalysisResult, cfg *config
 		buf.WriteString("\n")
 	}
 
-	orphans := filterByClassification(result.ClassifiedMedia, models.MediaOrphan)
 	if len(orphans) > 0 {
-		var totalSize int64
+		var orphanTotalSize int64
 		for _, cm := range orphans {
-			totalSize += cm.File.Size
+			orphanTotalSize += cm.File.Size
 		}
 		buf.WriteString("## Orphaned Media\n\n")
 		buf.WriteString("Media files found on disk that are not tracked by Sonarr or Radarr:\n\n")
@@ -97,7 +126,7 @@ func (mf *MarkdownFormatter) Format(result *analysis.AnalysisResult, cfg *config
 		buf.WriteString("- Media that was deleted from Sonarr/Radarr but not from disk\n")
 		buf.WriteString("- Test files or incomplete imports\n\n")
 		buf.WriteString("**Grace window**: Files newer than the configured grace hours are excluded to avoid false positives during active imports.\n\n")
-		buf.WriteString(fmt.Sprintf("**Total Size**: %s\n\n", formatBytes(totalSize)))
+		buf.WriteString(fmt.Sprintf("**Total Size**: %s\n\n", formatBytes(orphanTotalSize)))
 		buf.WriteString("| Path | Age | Size |\n")
 		buf.WriteString("|------|-----|------|\n")
 		sort.Slice(orphans, func(i, j int) bool {
@@ -110,11 +139,10 @@ func (mf *MarkdownFormatter) Format(result *analysis.AnalysisResult, cfg *config
 		buf.WriteString("\n")
 	}
 
-	orphanedDownloads := filterByClassification(result.ClassifiedMedia, models.MediaOrphanedDownload)
 	if len(orphanedDownloads) > 0 {
-		var totalSize int64
+		var downloadTotalSize int64
 		for _, cm := range orphanedDownloads {
-			totalSize += cm.File.Size
+			downloadTotalSize += cm.File.Size
 		}
 		buf.WriteString("## Orphaned Downloads\n\n")
 		buf.WriteString("Files in torrent directories that are NOT hardlinked to the media library and NOT tracked by Sonarr/Radarr:\n\n")
@@ -129,7 +157,7 @@ func (mf *MarkdownFormatter) Format(result *analysis.AnalysisResult, cfg *config
 		buf.WriteString("- Hardlink count = 1 (not linked to media)\n")
 		buf.WriteString("- Not found in Sonarr/Radarr episode/movie lists\n")
 		buf.WriteString("- Age exceeds grace window\n\n")
-		buf.WriteString(fmt.Sprintf("**Total Size**: %s\n\n", formatBytes(totalSize)))
+		buf.WriteString(fmt.Sprintf("**Total Size**: %s\n\n", formatBytes(downloadTotalSize)))
 		buf.WriteString(fmt.Sprintf("**File Count**: %d\n\n", len(orphanedDownloads)))
 		buf.WriteString("| Path | Age | Size | Hardlinks |\n")
 		buf.WriteString("|------|-----|------|-----------|\n")
