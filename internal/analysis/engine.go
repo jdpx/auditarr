@@ -210,12 +210,14 @@ func (e *Engine) hasMatchingMediaFile(t models.Torrent, mediaLookup map[string]*
 	for _, f := range t.Files {
 		fullPath := filepath.Join(t.SavePath, f)
 
-		hardlinked := isHardlinked(fullPath)
+		// Apply path mapping FIRST before checking hardlinks
+		normalizedPath := utils.NormalizePath(fullPath, e.pathMappings)
+
+		hardlinked := isHardlinked(normalizedPath)
 		if hardlinked {
 			return true
 		}
 
-		normalizedPath := utils.NormalizePath(fullPath, e.pathMappings)
 		if _, exists := mediaLookup[e.normalizePath(normalizedPath)]; exists {
 			return true
 		}
