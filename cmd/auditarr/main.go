@@ -187,15 +187,30 @@ func runScan(args []string) {
 	duration := time.Since(startTime)
 	result.Summary.Duration = duration
 
-	formatter := reporting.NewMarkdownFormatter()
-	reportContent := formatter.Format(result, cfg, duration)
-
 	reportDir := cfg.GetReportPath()
-	reportPath, err := formatter.WriteToFile(reportContent, reportDir)
+
+	// Generate Markdown report
+	mdFormatter := reporting.NewMarkdownFormatter()
+	reportContent := mdFormatter.Format(result, cfg, duration)
+	reportPath, err := mdFormatter.WriteToFile(reportContent, reportDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: failed to write report: %v\n", err)
 	} else {
 		fmt.Printf("Report written to: %s\n", reportPath)
+	}
+
+	// Generate JSON report
+	jsonFormatter := reporting.NewJSONFormatter()
+	jsonData, err := jsonFormatter.Format(result, cfg, duration)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to generate JSON report: %v\n", err)
+	} else {
+		jsonPath, err := jsonFormatter.WriteToFile(jsonData, reportDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to write JSON report: %v\n", err)
+		} else {
+			fmt.Printf("JSON report written to: %s\n", jsonPath)
+		}
 	}
 
 	notifier := reporting.NewDiscordNotifier(cfg.Notifications.DiscordWebhook)
