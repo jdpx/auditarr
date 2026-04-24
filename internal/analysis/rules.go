@@ -9,6 +9,10 @@ func ClassifyMedia(
 	arrFile *models.ArrFile,
 	graceHours int,
 ) (models.MediaClassification, bool) {
+	if media.IsHidden {
+		return models.MediaHiddenFile, true
+	}
+
 	if graceHours <= 0 {
 		graceHours = 0
 	}
@@ -33,6 +37,10 @@ func ClassifyTorrentFile(
 	arrFile *models.ArrFile,
 	graceHours int,
 ) (models.MediaClassification, bool) {
+	if media.IsHidden {
+		return models.MediaHiddenFile, true
+	}
+
 	if graceHours <= 0 {
 		graceHours = 0
 	}
@@ -50,4 +58,8 @@ func ClassifyTorrentFile(
 	}
 
 	return models.MediaHealthy, true
+}
+
+func ClassifyExtraFile(media models.MediaFile) (models.MediaClassification, bool) {
+	return models.MediaLostAndFound, true
 }

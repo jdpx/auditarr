@@ -9,6 +9,8 @@ const (
 	MediaAtRisk           MediaClassification = "at_risk"
 	MediaOrphan           MediaClassification = "orphan"
 	MediaOrphanedDownload MediaClassification = "orphaned_download"
+	MediaHiddenFile       MediaClassification = "hidden_file"
+	MediaLostAndFound     MediaClassification = "lost_and_found"
 )
 
 type ClassifiedMedia struct {

@@ -19,8 +19,9 @@ type Config struct {
 }
 
 type PathsConfig struct {
-	MediaRoot   string `toml:"media_root"`
-	TorrentRoot string `toml:"torrent_root"`
+	MediaRoot      string   `toml:"media_root"`
+	TorrentRoot    string   `toml:"torrent_root"`
+	ExtraScanPaths []string `toml:"extra_scan_paths"`
 }
 
 type ArrConfig struct {

@@ -18,14 +18,16 @@ type Collector interface {
 }
 
 type FilesystemCollector struct {
-	mediaRoot   string
-	torrentRoot string
+	mediaRoot      string
+	torrentRoot    string
+	extraScanPaths []string
 }
 
-func NewFilesystemCollector(mediaRoot, torrentRoot string) *FilesystemCollector {
+func NewFilesystemCollector(mediaRoot, torrentRoot string, extraScanPaths []string) *FilesystemCollector {
 	return &FilesystemCollector{
-		mediaRoot:   mediaRoot,
-		torrentRoot: torrentRoot,
+		mediaRoot:      mediaRoot,
+		torrentRoot:    torrentRoot,
+		extraScanPaths: extraScanPaths,
 	}
 }
 
@@ -50,6 +52,17 @@ func (fc *FilesystemCollector) Collect(ctx context.Context) ([]models.MediaFile,
 			return nil, fmt.Errorf("failed to collect from torrent root: %w", err)
 		}
 		allFiles = append(allFiles, torrentFiles...)
+	}
+
+	for _, extraPath := range fc.extraScanPaths {
+		if extraPath != "" {
+			extraFiles, err := fc.collectFromPath(ctx, extraPath, models.MediaSourceExtra)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to collect from extra path %s: %v\n", extraPath, err)
+				continue
+			}
+			allFiles = append(allFiles, extraFiles...)
+		}
 	}
 
 	return allFiles, nil
@@ -78,17 +91,23 @@ func (fc *FilesystemCollector) collectFromPath(ctx context.Context, root string,
 		}
 
 		if d.IsDir() {
-			if strings.HasPrefix(d.Name(), ".") {
+			// Skip hidden directories (but not for extra scan paths like lost+found)
+			if source != models.MediaSourceExtra && strings.HasPrefix(d.Name(), ".") {
 				return filepath.SkipDir
 			}
 			return nil
 		}
 
-		if strings.HasPrefix(filepath.Base(path), ".") {
+		isHidden := strings.HasPrefix(filepath.Base(path), ".")
+
+		// For library/torrent sources: skip hidden files unless they're .parts files
+		// For extra sources: collect everything
+		if source != models.MediaSourceExtra && isHidden && !strings.HasSuffix(path, ".parts") {
 			return nil
 		}
 
-		if analysis.IsMetadataFile(path) {
+		// Skip metadata files (but not for extra scan paths or hidden files)
+		if !isHidden && source != models.MediaSourceExtra && analysis.IsMetadataFile(path) {
 			return nil
 		}
 
@@ -98,18 +117,21 @@ func (fc *FilesystemCollector) collectFromPath(ctx context.Context, root string,
 			return nil
 		}
 
-		hardlinkCount, err := getHardlinkCount(path)
+		hardlinkCount, blockSize, err := getFileStats(path)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to get hardlink count for %s: %v\n", path, err)
+			fmt.Fprintf(os.Stderr, "Warning: failed to get file stats for %s: %v\n", path, err)
 			hardlinkCount = 1
+			blockSize = info.Size()
 		}
 
 		files = append(files, models.MediaFile{
 			Path:          path,
 			Size:          info.Size(),
+			BlockSize:     blockSize,
 			ModTime:       info.ModTime(),
 			HardlinkCount: hardlinkCount,
 			IsHardlinked:  hardlinkCount > 1,
+			IsHidden:      isHidden,
 			Source:        source,
 		})
 
@@ -123,11 +145,11 @@ func (fc *FilesystemCollector) collectFromPath(ctx context.Context, root string,
 	return files, nil
 }
 
-func getHardlinkCount(path string) (int, error) {
+func getFileStats(path string) (hardlinks int, blockSize int64, err error) {
 	var stat syscall.Stat_t
-	err := syscall.Stat(path, &stat)
+	err = syscall.Stat(path, &stat)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	return int(stat.Nlink), nil
+	return int(stat.Nlink), stat.Blocks * 512, nil
 }

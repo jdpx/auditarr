@@ -64,7 +64,7 @@ func runScan(args []string) {
 		fmt.Println("Starting media audit...")
 	}
 
-	fsCollector := collectors.NewFilesystemCollector(cfg.Paths.MediaRoot, cfg.Paths.TorrentRoot)
+	fsCollector := collectors.NewFilesystemCollector(cfg.Paths.MediaRoot, cfg.Paths.TorrentRoot, cfg.Paths.ExtraScanPaths)
 
 	if *verbose {
 		fmt.Println("Collecting filesystem data...")

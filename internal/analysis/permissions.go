@@ -7,14 +7,19 @@ import (
 var metadataPatterns = []string{
 	"*-thumb.jpg", "*-thumb.png",
 	"poster.jpg", "poster.png",
+	"*poster*.jpg", "*poster*.png",
+	"*box cover*.jpg", "*box cover*.png",
 	"backdrop.jpg", "backdrop.png",
 	"folder.jpg", "folder.png",
 	"logo.png",
 	"logo.svg",
 	"season*-poster.jpg", "season*-poster.png",
 	"banner.jpg", "landscape.jpg", "clearlogo.png",
+	"*screen*.jpg", "*screen*.png",
+	"downloaded from*.txt",
 	"*.nfo",
 	"*.torrent",
+	"*.srt", "*.ass", "*.ssa", "*.vtt", "*.sub", "*.idx", "*.pgs",
 }
 
 func IsMetadataFile(path string) bool {

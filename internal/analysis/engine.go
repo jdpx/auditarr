@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -13,12 +14,21 @@ import (
 )
 
 type AnalysisResult struct {
-	ClassifiedMedia  []models.ClassifiedMedia
-	SuspiciousFiles  []models.SuspiciousFile
-	UnlinkedTorrents []models.Torrent
-	PermissionIssues []models.PermissionIssue
-	Summary          SummaryStats
-	ConnectionStatus []ServiceStatus
+	ClassifiedMedia      []models.ClassifiedMedia
+	SuspiciousFiles      []models.SuspiciousFile
+	UnlinkedTorrents     []models.Torrent
+	PermissionIssues     []models.PermissionIssue
+	OrphanedDirectories  []OrphanedDirectory
+	Summary              SummaryStats
+	ConnectionStatus     []ServiceStatus
+}
+
+type OrphanedDirectory struct {
+	Path           string
+	OrphanedCount  int
+	TotalCount     int
+	TotalSize      int64
+	FullyOrphaned  bool
 }
 
 type ServiceStatus struct {
@@ -34,9 +44,13 @@ type SummaryStats struct {
 	AtRiskCount           int
 	OrphanCount           int
 	OrphanedDownloadCount int
+	HiddenFileCount       int
+	LostAndFoundCount     int
 	SuspiciousCount       int
 	PermissionErrors      int
 	PermissionWarnings    int
+	TotalLogicalSize      int64
+	TotalBlockSize        int64
 	Duration              time.Duration
 }
 
@@ -99,6 +113,10 @@ func (e *Engine) Analyze(
 			continue
 		}
 
+		// Track disk usage stats for all files
+		result.Summary.TotalLogicalSize += media.Size
+		result.Summary.TotalBlockSize += media.BlockSize
+
 		lookupKey := e.normalizePath(media.Path)
 		arrFile := arrLookup[lookupKey]
 		graceHours := e.getGraceHours(arrFile, media.Source)
@@ -106,9 +124,12 @@ func (e *Engine) Analyze(
 		var classification models.MediaClassification
 		var shouldInclude bool
 
-		if media.Source == models.MediaSourceTorrent {
+		switch media.Source {
+		case models.MediaSourceExtra:
+			classification, shouldInclude = ClassifyExtraFile(media)
+		case models.MediaSourceTorrent:
 			classification, shouldInclude = ClassifyTorrentFile(media, arrFile, graceHours)
-		} else {
+		default:
 			classification, shouldInclude = ClassifyMedia(media, arrFile, graceHours)
 		}
 
@@ -135,17 +156,25 @@ func (e *Engine) Analyze(
 			Reason:         getReason(classification, media, arrFile),
 		})
 
-		if classification == models.MediaHealthy {
+		switch classification {
+		case models.MediaHealthy:
 			result.Summary.HealthyCount++
-		} else if classification == models.MediaAtRisk {
+		case models.MediaAtRisk:
 			result.Summary.AtRiskCount++
-		} else if classification == models.MediaOrphan {
+		case models.MediaOrphan:
 			result.Summary.OrphanCount++
-		} else if classification == models.MediaOrphanedDownload {
+		case models.MediaOrphanedDownload:
 			result.Summary.OrphanedDownloadCount++
+		case models.MediaHiddenFile:
+			result.Summary.HiddenFileCount++
+		case models.MediaLostAndFound:
+			result.Summary.LostAndFoundCount++
 		}
 		result.Summary.TotalFiles++
 	}
+
+	// Build directory-level orphan summary
+	result.OrphanedDirectories = e.buildOrphanedDirectories(result.ClassifiedMedia)
 
 	for _, t := range torrents {
 		if t.State == models.StateCompleted && !t.WithinGraceWindow(e.qbittorrentGraceHours) {
@@ -259,9 +288,61 @@ func getReason(class models.MediaClassification, media models.MediaFile, arrFile
 		return "Not tracked by Arr (outside grace window)"
 	case models.MediaOrphanedDownload:
 		return "Orphaned download: in torrent dir, not hardlinked, not tracked by Arr"
+	case models.MediaHiddenFile:
+		return "Hidden file (dot-prefix): likely incomplete download fragment"
+	case models.MediaLostAndFound:
+		return "Found in extra scan path (e.g. lost+found): filesystem recovery artifact"
 	default:
 		return "Unknown classification"
 	}
+}
+
+func (e *Engine) buildOrphanedDirectories(classified []models.ClassifiedMedia) []OrphanedDirectory {
+	type dirStats struct {
+		orphanedCount int
+		totalCount    int
+		totalSize     int64
+	}
+
+	dirs := make(map[string]*dirStats)
+
+	for _, cm := range classified {
+		if cm.File.Source != models.MediaSourceTorrent {
+			continue
+		}
+
+		dir := filepath.Dir(cm.File.Path)
+
+		if _, exists := dirs[dir]; !exists {
+			dirs[dir] = &dirStats{}
+		}
+		dirs[dir].totalCount++
+		dirs[dir].totalSize += cm.File.Size
+
+		if cm.Classification == models.MediaOrphanedDownload || cm.Classification == models.MediaHiddenFile {
+			dirs[dir].orphanedCount++
+		}
+	}
+
+	var result []OrphanedDirectory
+	for path, stats := range dirs {
+		if stats.orphanedCount == 0 {
+			continue
+		}
+		result = append(result, OrphanedDirectory{
+			Path:          path,
+			OrphanedCount: stats.orphanedCount,
+			TotalCount:    stats.totalCount,
+			TotalSize:     stats.totalSize,
+			FullyOrphaned: stats.orphanedCount == stats.totalCount,
+		})
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].TotalSize > result[j].TotalSize
+	})
+
+	return result
 }
 
 func (e *Engine) auditPermissions(file models.FilePermissions) []models.PermissionIssue {

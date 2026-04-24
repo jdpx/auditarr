@@ -7,14 +7,17 @@ type MediaFileSource string
 const (
 	MediaSourceLibrary MediaFileSource = "library"
 	MediaSourceTorrent MediaFileSource = "torrent"
+	MediaSourceExtra   MediaFileSource = "extra"
 )
 
 type MediaFile struct {
 	Path          string
 	Size          int64
+	BlockSize     int64
 	ModTime       time.Time
 	HardlinkCount int
 	IsHardlinked  bool
+	IsHidden      bool
 	Source        MediaFileSource
 }
 

@@ -35,6 +35,8 @@ func (mf *MarkdownFormatter) Format(result *analysis.AnalysisResult, cfg *config
 	buf.WriteString(fmt.Sprintf("| At Risk | %d | ⚠️ | Tracked by Arr but NOT hardlinked (no torrent protection) |\n", result.Summary.AtRiskCount))
 	buf.WriteString(fmt.Sprintf("| Orphaned Media | %d | ❌ | Not tracked by Arr (outside grace window) |\n", result.Summary.OrphanCount))
 	buf.WriteString(fmt.Sprintf("| Orphaned Downloads | %d | 💾 | Files in torrent dir not hardlinked or tracked |\n", result.Summary.OrphanedDownloadCount))
+	buf.WriteString(fmt.Sprintf("| Hidden Files | %d | 👻 | Hidden dot-files (e.g. .parts fragments) |\n", result.Summary.HiddenFileCount))
+	buf.WriteString(fmt.Sprintf("| Lost+Found | %d | 🔧 | Files in extra scan paths (e.g. lost+found) |\n", result.Summary.LostAndFoundCount))
 	buf.WriteString(fmt.Sprintf("| Suspicious Files | %d | 🚨 | Suspicious extensions detected |\n", result.Summary.SuspiciousCount))
 	buf.WriteString("\n")
 
@@ -68,6 +70,21 @@ func (mf *MarkdownFormatter) Format(result *analysis.AnalysisResult, cfg *config
 	buf.WriteString(fmt.Sprintf("| Orphaned Media | %s |\n", formatBytes(totalOrphanSize)))
 	buf.WriteString(fmt.Sprintf("| Orphaned Downloads | %s |\n", formatBytes(totalOrphanedDownloadSize)))
 	buf.WriteString("\n")
+
+	// Disk usage section
+	if result.Summary.TotalLogicalSize > 0 {
+		buf.WriteString("## Disk Usage\n\n")
+		buf.WriteString("Actual disk blocks consumed vs logical file sizes (hardlinks share blocks):\n\n")
+		buf.WriteString("| Metric | Value |\n")
+		buf.WriteString("|--------|-------|\n")
+		buf.WriteString(fmt.Sprintf("| Logical Size (sum of all file sizes) | %s |\n", formatBytes(result.Summary.TotalLogicalSize)))
+		buf.WriteString(fmt.Sprintf("| Actual Disk Blocks | %s |\n", formatBytes(result.Summary.TotalBlockSize)))
+		if result.Summary.TotalLogicalSize > 0 {
+			ratio := float64(result.Summary.TotalBlockSize) / float64(result.Summary.TotalLogicalSize) * 100
+			buf.WriteString(fmt.Sprintf("| Block/Logical Ratio | %.1f%% |\n", ratio))
+		}
+		buf.WriteString("\n")
+	}
 
 	if len(result.ConnectionStatus) > 0 {
 		buf.WriteString("## Service Connections\n\n")
@@ -216,6 +233,77 @@ func (mf *MarkdownFormatter) Format(result *analysis.AnalysisResult, cfg *config
 			fullPath := filepath.Join(t.SavePath, t.Name)
 			displayPath := utils.NormalizePath(fullPath, cfg.PathMappings)
 			buf.WriteString(fmt.Sprintf("| `%s` | %s | %s |\n", escapeMarkdown(displayPath), completed, formatBytes(t.Size)))
+		}
+		buf.WriteString("\n")
+	}
+
+	// Hidden files section
+	hiddenFiles := filterByClassification(result.ClassifiedMedia, models.MediaHiddenFile)
+	if len(hiddenFiles) > 0 {
+		var hiddenTotalSize int64
+		for _, cm := range hiddenFiles {
+			hiddenTotalSize += cm.File.Size
+		}
+		buf.WriteString("## Hidden Files\n\n")
+		buf.WriteString("Hidden dot-files found in media/torrent directories (typically qBittorrent `.parts` incomplete download fragments):\n\n")
+		buf.WriteString(fmt.Sprintf("**Total Size**: %s\n\n", formatBytes(hiddenTotalSize)))
+		buf.WriteString("| Path | Size |\n")
+		buf.WriteString("|------|------|\n")
+		sort.Slice(hiddenFiles, func(i, j int) bool {
+			return hiddenFiles[i].File.Size > hiddenFiles[j].File.Size
+		})
+		for _, cm := range hiddenFiles {
+			buf.WriteString(fmt.Sprintf("| `%s` | %s |\n", escapeMarkdown(cm.File.Path), formatBytes(cm.File.Size)))
+		}
+		buf.WriteString("\n")
+	}
+
+	// Lost+found section
+	lostFound := filterByClassification(result.ClassifiedMedia, models.MediaLostAndFound)
+	if len(lostFound) > 0 {
+		var lfTotalSize, lfTotalBlocks int64
+		for _, cm := range lostFound {
+			lfTotalSize += cm.File.Size
+			lfTotalBlocks += cm.File.BlockSize
+		}
+		buf.WriteString("## Lost+Found Files\n\n")
+		buf.WriteString("Files found in extra scan paths (e.g. ext4 lost+found). These are typically sparse filesystem recovery artifacts.\n\n")
+		buf.WriteString(fmt.Sprintf("**Apparent Size**: %s | **Actual Blocks**: %s | **Files**: %d\n\n", formatBytes(lfTotalSize), formatBytes(lfTotalBlocks), len(lostFound)))
+		buf.WriteString("| Path | Apparent Size | Block Size | Age |\n")
+		buf.WriteString("|------|---------------|------------|-----|\n")
+		sort.Slice(lostFound, func(i, j int) bool {
+			return lostFound[i].File.Size > lostFound[j].File.Size
+		})
+		for _, cm := range lostFound {
+			age := time.Since(cm.File.ModTime)
+			buf.WriteString(fmt.Sprintf("| `%s` | %s | %s | %s |\n", escapeMarkdown(cm.File.Path), formatBytes(cm.File.Size), formatBytes(cm.File.BlockSize), formatDuration(age)))
+		}
+		buf.WriteString("\n")
+	}
+
+	// Orphaned directories section
+	if len(result.OrphanedDirectories) > 0 {
+		fullyOrphanedCount := 0
+		var fullyOrphanedSize int64
+		for _, dir := range result.OrphanedDirectories {
+			if dir.FullyOrphaned {
+				fullyOrphanedCount++
+				fullyOrphanedSize += dir.TotalSize
+			}
+		}
+		buf.WriteString("## Orphaned Directories\n\n")
+		buf.WriteString("Torrent directories containing orphaned files, grouped for directory-level cleanup:\n\n")
+		if fullyOrphanedCount > 0 {
+			buf.WriteString(fmt.Sprintf("**Fully orphaned directories** (safe to remove entirely): **%d** (%s)\n\n", fullyOrphanedCount, formatBytes(fullyOrphanedSize)))
+		}
+		buf.WriteString("| Directory | Orphaned / Total | Size | Fully Orphaned |\n")
+		buf.WriteString("|-----------|------------------|------|----------------|\n")
+		for _, dir := range result.OrphanedDirectories {
+			status := "No"
+			if dir.FullyOrphaned {
+				status = "Yes"
+			}
+			buf.WriteString(fmt.Sprintf("| `%s` | %d / %d | %s | %s |\n", escapeMarkdown(dir.Path), dir.OrphanedCount, dir.TotalCount, formatBytes(dir.TotalSize), status))
 		}
 		buf.WriteString("\n")
 	}

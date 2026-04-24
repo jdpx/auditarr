@@ -3,7 +3,7 @@
 fetch-report:
 	@echo "Fetching latest auditarr report from louise..."
 	@mkdir -p reports
-	@ssh -q nas-louise 'cat $$(ls -t /var/lib/auditarr/reports/*.md | head -1)' > reports/auditarr-report-latest.md
+	@ssh -o LogLevel=ERROR -T nas-louise 'cat $$(ls -t /var/lib/auditarr/reports/*.md 2>/dev/null | head -1)' > reports/auditarr-report-latest.md
 	@echo "Downloaded: reports/auditarr-report-latest.md"
 
 # Download latest JSON report (for scripting)
@@ -11,7 +11,7 @@ fetch-report:
 fetch-json:
 	@echo "Fetching latest auditarr JSON report from louise..."
 	@mkdir -p reports
-	@ssh -q nas-louise 'cat $$(ls -t /var/lib/auditarr/reports/*.json | head -1)' > reports/auditarr-report-latest.json
+	@ssh -o LogLevel=ERROR -T nas-louise 'cat $$(ls -t /var/lib/auditarr/reports/*.json 2>/dev/null | head -1)' > reports/auditarr-report-latest.json
 	@echo "Downloaded: reports/auditarr-report-latest.json"
 
 # Download both Markdown and JSON reports
