@@ -100,15 +100,15 @@ func (rc *RadarrCollector) Collect(ctx context.Context) ([]models.ArrFile, error
 
 func (rc *RadarrCollector) fetchMovies(ctx context.Context) ([]radarrMovie, error) {
 	url := fmt.Sprintf("%s/api/v3/movie", rc.baseURL)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("X-Api-Key", rc.apiKey)
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := rc.client.Do(req)
+	resp, err := doWithRetry(ctx, rc.client, func() (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("X-Api-Key", rc.apiKey)
+		req.Header.Set("Accept", "application/json")
+		return req, nil
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -128,15 +128,15 @@ func (rc *RadarrCollector) fetchMovies(ctx context.Context) ([]radarrMovie, erro
 
 func (rc *RadarrCollector) fetchMovieFiles(ctx context.Context, movieID int) ([]radarrMovieFile, error) {
 	url := fmt.Sprintf("%s/api/v3/moviefile?movieId=%d", rc.baseURL, movieID)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("X-Api-Key", rc.apiKey)
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := rc.client.Do(req)
+	resp, err := doWithRetry(ctx, rc.client, func() (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("X-Api-Key", rc.apiKey)
+		req.Header.Set("Accept", "application/json")
+		return req, nil
+	})
 	if err != nil {
 		return nil, err
 	}

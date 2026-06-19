@@ -142,15 +142,15 @@ func (qbc *QBCollector) fetchTorrents(ctx context.Context) ([]qbTorrent, error) 
 	qbc.mu.Unlock()
 
 	url := fmt.Sprintf("%s/api/v2/torrents/info", qbc.baseURL)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Cookie", cookie)
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := qbc.client.Do(req)
+	resp, err := doWithRetry(ctx, qbc.client, func() (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Cookie", cookie)
+		req.Header.Set("Accept", "application/json")
+		return req, nil
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -183,15 +183,15 @@ func (qbc *QBCollector) fetchTorrentFiles(ctx context.Context, hash string) ([]s
 	qbc.mu.Unlock()
 
 	url := fmt.Sprintf("%s/api/v2/torrents/files?hash=%s", qbc.baseURL, hash)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Cookie", cookie)
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := qbc.client.Do(req)
+	resp, err := doWithRetry(ctx, qbc.client, func() (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Cookie", cookie)
+		req.Header.Set("Accept", "application/json")
+		return req, nil
+	})
 	if err != nil {
 		return nil, err
 	}

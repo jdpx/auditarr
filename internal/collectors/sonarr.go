@@ -101,15 +101,15 @@ func (sc *SonarrCollector) Collect(ctx context.Context) ([]models.ArrFile, error
 
 func (sc *SonarrCollector) fetchSeries(ctx context.Context) ([]sonarrSeries, error) {
 	url := fmt.Sprintf("%s/api/v3/series", sc.baseURL)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("X-Api-Key", sc.apiKey)
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := sc.client.Do(req)
+	resp, err := doWithRetry(ctx, sc.client, func() (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("X-Api-Key", sc.apiKey)
+		req.Header.Set("Accept", "application/json")
+		return req, nil
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -129,15 +129,15 @@ func (sc *SonarrCollector) fetchSeries(ctx context.Context) ([]sonarrSeries, err
 
 func (sc *SonarrCollector) fetchEpisodeFiles(ctx context.Context, seriesID int) ([]sonarrEpisodeFile, error) {
 	url := fmt.Sprintf("%s/api/v3/episodefile?seriesId=%d", sc.baseURL, seriesID)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("X-Api-Key", sc.apiKey)
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := sc.client.Do(req)
+	resp, err := doWithRetry(ctx, sc.client, func() (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("X-Api-Key", sc.apiKey)
+		req.Header.Set("Accept", "application/json")
+		return req, nil
+	})
 	if err != nil {
 		return nil, err
 	}
