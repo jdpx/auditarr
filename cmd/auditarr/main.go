@@ -179,6 +179,7 @@ func runScan(args []string) {
 		cfg.Permissions.SkipPaths,
 		cfg.Permissions.NonstandardSeverity,
 		cfg.PathMappings,
+		cfg.Paths.TorrentRoot,
 	)
 
 	result := engine.Analyze(mediaFiles, sonarrFiles, radarrFiles, torrents, permissions)

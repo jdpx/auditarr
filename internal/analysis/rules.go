@@ -36,6 +36,7 @@ func ClassifyTorrentFile(
 	media models.MediaFile,
 	arrFile *models.ArrFile,
 	graceHours int,
+	inActiveTorrent bool,
 ) (models.MediaClassification, bool) {
 	if media.IsHidden {
 		return models.MediaHiddenFile, true
@@ -53,7 +54,13 @@ func ClassifyTorrentFile(
 		return models.MediaHealthy, true
 	}
 
-	if arrFile == nil {
+	// A file is only an orphaned download if it is NOT tracked by Arr AND is not
+	// part of a torrent still managed by qBittorrent. A torrent the client still
+	// holds is being seeded (e.g. to meet a private-tracker ratio/seed-time
+	// requirement) or is waiting to be imported — deleting it would break the
+	// torrent and lose wanted, not-yet-imported content. Only once qBittorrent no
+	// longer manages it is the leftover file genuinely orphaned.
+	if arrFile == nil && !inActiveTorrent {
 		return models.MediaOrphanedDownload, true
 	}
 

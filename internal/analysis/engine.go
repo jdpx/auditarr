@@ -14,21 +14,21 @@ import (
 )
 
 type AnalysisResult struct {
-	ClassifiedMedia      []models.ClassifiedMedia
-	SuspiciousFiles      []models.SuspiciousFile
-	UnlinkedTorrents     []models.Torrent
-	PermissionIssues     []models.PermissionIssue
-	OrphanedDirectories  []OrphanedDirectory
-	Summary              SummaryStats
-	ConnectionStatus     []ServiceStatus
+	ClassifiedMedia     []models.ClassifiedMedia
+	SuspiciousFiles     []models.SuspiciousFile
+	UnlinkedTorrents    []models.Torrent
+	PermissionIssues    []models.PermissionIssue
+	OrphanedDirectories []OrphanedDirectory
+	Summary             SummaryStats
+	ConnectionStatus    []ServiceStatus
 }
 
 type OrphanedDirectory struct {
-	Path           string
-	OrphanedCount  int
-	TotalCount     int
-	TotalSize      int64
-	FullyOrphaned  bool
+	Path          string
+	OrphanedCount int
+	TotalCount    int
+	TotalSize     int64
+	FullyOrphaned bool
 }
 
 type ServiceStatus struct {
@@ -67,6 +67,7 @@ type Engine struct {
 	skipPaths             []string
 	nonstandardSeverity   string
 	pathMappings          map[string]string
+	torrentRoot           string
 }
 
 func NewEngine(
@@ -80,6 +81,7 @@ func NewEngine(
 	permSkipPaths []string,
 	permNonstandardSeverity string,
 	pathMappings map[string]string,
+	torrentRoot string,
 ) *Engine {
 	return &Engine{
 		sonarrGraceHours:      sonarrGrace,
@@ -94,6 +96,7 @@ func NewEngine(
 		skipPaths:             permSkipPaths,
 		nonstandardSeverity:   permNonstandardSeverity,
 		pathMappings:          pathMappings,
+		torrentRoot:           torrentRoot,
 	}
 }
 
@@ -107,6 +110,7 @@ func (e *Engine) Analyze(
 	result := &AnalysisResult{}
 
 	arrLookup := e.buildArrLookup(sonarrFiles, radarrFiles)
+	torrentFileIndex := e.buildTorrentFileIndex(torrents)
 
 	for _, media := range mediaFiles {
 		if shouldSkip(media.Path, e.skipPaths) {
@@ -128,7 +132,8 @@ func (e *Engine) Analyze(
 		case models.MediaSourceExtra:
 			classification, shouldInclude = ClassifyExtraFile(media)
 		case models.MediaSourceTorrent:
-			classification, shouldInclude = ClassifyTorrentFile(media, arrFile, graceHours)
+			inActiveTorrent := e.belongsToActiveTorrent(media.Path, torrentFileIndex)
+			classification, shouldInclude = ClassifyTorrentFile(media, arrFile, graceHours, inActiveTorrent)
 		default:
 			classification, shouldInclude = ClassifyMedia(media, arrFile, graceHours)
 		}
@@ -235,6 +240,45 @@ func (e *Engine) buildArrLookup(sonarrFiles, radarrFiles []models.ArrFile) map[s
 		}
 	}
 	return lookup
+}
+
+// buildTorrentFileIndex indexes every file currently managed by qBittorrent by
+// its (lowercased) basename, mapping to the full qBittorrent-side paths. It is
+// used to tell whether a scanned torrent-dir file still belongs to a live
+// torrent, regardless of how the download client's mount differs from ours.
+func (e *Engine) buildTorrentFileIndex(torrents []models.Torrent) map[string][]string {
+	idx := make(map[string][]string)
+	for _, t := range torrents {
+		for _, f := range t.Files {
+			full := strings.ToLower(filepath.Clean(filepath.Join(t.SavePath, f)))
+			base := strings.ToLower(filepath.Base(f))
+			idx[base] = append(idx[base], full)
+		}
+	}
+	return idx
+}
+
+// belongsToActiveTorrent reports whether a scanned file (host path) is part of a
+// torrent qBittorrent still manages. It matches on the torrent-root-relative
+// path suffix, so it is independent of the differing /data mount points between
+// qBittorrent and the *arr apps. A match means the file is being seeded or is
+// awaiting import — it must not be treated as an orphaned download.
+func (e *Engine) belongsToActiveTorrent(hostPath string, idx map[string][]string) bool {
+	if e.torrentRoot == "" || len(idx) == 0 {
+		return false
+	}
+	rel, err := filepath.Rel(e.torrentRoot, hostPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return false
+	}
+	rel = strings.ToLower(filepath.Clean(rel))
+	base := strings.ToLower(filepath.Base(hostPath))
+	for _, cand := range idx[base] {
+		if cand == rel || strings.HasSuffix(cand, "/"+rel) {
+			return true
+		}
+	}
+	return false
 }
 
 func (e *Engine) hasMatchingMediaFile(t models.Torrent, mediaLookup map[string]*models.ArrFile) bool {
