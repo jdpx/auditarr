@@ -110,14 +110,19 @@ func (qbc *QBCollector) authenticate(ctx context.Context) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	// qBittorrent <5 returns 200 ("Ok."); 5.x returns 204 (No Content) on a
+	// successful login. Treat both as success.
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		_, _ = io.Copy(io.Discard, resp.Body)
 		return fmt.Errorf("authentication failed with status %d", resp.StatusCode)
 	}
 
 	for _, cookie := range resp.Cookies() {
-		if cookie.Name == "SID" {
-			qbc.cookie = cookie.Value
+		// qBittorrent <5 names the session cookie "SID"; 5.x uses a
+		// port-suffixed "QBT_SID_<port>". Store the full name=value pair so it
+		// is echoed back verbatim on subsequent requests.
+		if cookie.Name == "SID" || strings.HasPrefix(cookie.Name, "QBT_SID") {
+			qbc.cookie = cookie.Name + "=" + cookie.Value
 			break
 		}
 	}
@@ -142,7 +147,7 @@ func (qbc *QBCollector) fetchTorrents(ctx context.Context) ([]qbTorrent, error) 
 		return nil, err
 	}
 
-	req.Header.Set("Cookie", fmt.Sprintf("SID=%s", cookie))
+	req.Header.Set("Cookie", cookie)
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := qbc.client.Do(req)
@@ -183,7 +188,7 @@ func (qbc *QBCollector) fetchTorrentFiles(ctx context.Context, hash string) ([]s
 		return nil, err
 	}
 
-	req.Header.Set("Cookie", fmt.Sprintf("SID=%s", cookie))
+	req.Header.Set("Cookie", cookie)
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := qbc.client.Do(req)
